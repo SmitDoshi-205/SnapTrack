@@ -1,6 +1,6 @@
 import Badge from '../UI/Badge.jsx'
 
-function TaskCard({ task }) {
+function TaskCard({ task, onClick }) {
   const { title, description, priority, tags, dueDate } = task
 
   const priorityColor = {
@@ -19,15 +19,16 @@ function TaskCard({ task }) {
   const isOverdue = dueDate && new Date(dueDate) < new Date()
 
   return (
-    <div className="
-      bg-white rounded-xl p-4
-      border border-gray-200
-      hover:border-blue-300 hover:shadow-sm
-      transition-all duration-150
-      cursor-pointer
-      group
-    ">
-
+    <div
+      onClick={onClick}
+      className="
+        bg-white dark:bg-gray-700 rounded-xl p-4
+        border border-gray-200 dark:border-gray-600
+        hover:border-blue-300 hover:shadow-sm
+        transition-all duration-150
+        cursor-pointer group
+      "
+    >
       <div className="flex items-center justify-between mb-2">
         <Badge label={priority} color={priorityColor[priority] || 'gray'} />
         {isOverdue && (
@@ -35,12 +36,12 @@ function TaskCard({ task }) {
         )}
       </div>
 
-      <h3 className="text-sm font-semibold text-gray-800 mb-1 group-hover:text-blue-600 transition-colors">
+      <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1 group-hover:text-blue-600 transition-colors">
         {title}
       </h3>
 
       {description && (
-        <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
           {description}
         </p>
       )}
@@ -58,7 +59,6 @@ function TaskCard({ task }) {
           Due {formattedDate}
         </div>
       )}
-
     </div>
   )
 }
