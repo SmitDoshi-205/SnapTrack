@@ -1,7 +1,7 @@
 import TaskCard from './TaskCard.jsx'
 import Button from '../UI/Button.jsx'
 
-function Column({ title, tasks, onAddTask }) {
+function Column({ title, tasks, onAddTask, onTaskClick }) {
   const accentColor = {
     'To Do':       'bg-gray-400',
     'In Progress': 'bg-blue-500',
@@ -11,18 +11,17 @@ function Column({ title, tasks, onAddTask }) {
   const accent = accentColor[title] || 'bg-gray-400'
 
   return (
-    <div className="bg-gray-50 rounded-2xl p-4 w-80 flex-shrink-0 flex flex-col">
+    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-4 w-80 flex-shrink-0 flex flex-col">
 
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className={`w-2.5 h-2.5 rounded-full ${accent}`} />
-          <h2 className="font-semibold text-gray-700 text-sm">{title}</h2>
-          <span className="bg-gray-200 text-gray-500 text-xs font-medium px-2 py-0.5 rounded-full">
+          <h2 className="font-semibold text-gray-700 dark:text-gray-200 text-sm">{title}</h2>
+          <span className="bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-medium px-2 py-0.5 rounded-full">
             {tasks.length}
           </span>
         </div>
-
-       <Button variant="ghost" onClick={onAddTask}>
+        <Button variant="ghost" onClick={onAddTask}>
           + Add
         </Button>
       </div>
@@ -34,7 +33,11 @@ function Column({ title, tasks, onAddTask }) {
           </div>
         ) : (
           tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onClick={() => onTaskClick(task)}
+            />
           ))
         )}
       </div>
