@@ -1,7 +1,11 @@
+// client/src/App.jsx
+import { useState, useEffect } from 'react'
 import Navbar from './components/Navbar.jsx'
 import Column from './components/Kanban/Column.jsx'
+import TaskModal from './components/Kanban/TaskModal.jsx'
+import { saveBoard, loadBoard } from './Store/boardStore.js'
 
-const INITIAL_COLUMNS = [
+const DEFAULT_COLUMNS = [
   {
     id: 'todo',
     title: 'To Do',
@@ -63,27 +67,105 @@ const INITIAL_COLUMNS = [
 ]
 
 function App() {
-  const handleAddTask = (columnId) => {
-    console.log('Add task to column:', columnId)
+  // Load from localStorage on first render
+  const [columns, setColumns] = useState(() => loadBoard() || DEFAULT_COLUMNS)
+
+  // Modal state 
+  const [modalOpen, setModalOpen]   = useState(false)
+  const [activeTask, setActiveTask] = useState(null)    
+  const [activeColId, setActiveColId] = useState(null)
+
+  // Persist to localStorage every time columns changes
+  useEffect(() => {
+    saveBoard(columns)
+  }, [columns])
+
+  // Open modal in CREATE mode
+  function handleAddTask(columnId) {
+    setActiveTask(null)
+    setActiveColId(columnId)
+    setModalOpen(true)
+  }
+
+  // Open modal in EDIT mode
+  function handleTaskClick(task, columnId) {
+    setActiveTask(task)
+    setActiveColId(columnId)
+    setModalOpen(true)
+  }
+
+  function handleCloseModal() {
+    setModalOpen(false)
+    setActiveTask(null)
+    setActiveColId(null)
+  }
+
+  // Add a new task to the correct column
+  function handleAddNewTask(columnId, newTask) {
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? { ...col, tasks: [...col.tasks, newTask] }
+          : col
+      )
+    )
+  }
+
+  // Replace an existing task with updated data
+  function handleEditTask(updatedTask) {
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === activeColId
+          ? {
+              ...col,
+              tasks: col.tasks.map((t) =>
+                t.id === updatedTask.id ? updatedTask : t
+              ),
+            }
+          : col
+      )
+    )
+  }
+
+  // Remove a task from its column
+  function handleDeleteTask(taskId, columnId) {
+    setColumns((prev) =>
+      prev.map((col) =>
+        col.id === columnId
+          ? { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) }
+          : col
+      )
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200">
 
-      <Navbar boardName="React App" />
+      <Navbar boardName="My First Board" />
 
       <main className="p-6 overflow-x-auto">
         <div className="flex gap-5 min-w-max">
-          {INITIAL_COLUMNS.map((column) => (
+          {columns.map((column) => (
             <Column
               key={column.id}
               title={column.title}
               tasks={column.tasks}
               onAddTask={() => handleAddTask(column.id)}
+              onTaskClick={(task) => handleTaskClick(task, column.id)}
             />
           ))}
         </div>
       </main>
+
+      <TaskModal
+        isOpen={modalOpen}
+        onClose={handleCloseModal}
+        onAdd={handleAddNewTask}
+        onEdit={handleEditTask}
+        onDelete={handleDeleteTask}
+        task={activeTask}
+        columnId={activeColId}
+      />
 
     </div>
   )
