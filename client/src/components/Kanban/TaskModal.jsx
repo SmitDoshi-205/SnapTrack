@@ -1,4 +1,3 @@
-// client/src/components/kanban/TaskModal.jsx
 import { useState, useEffect } from 'react'
 import Input from '../UI/Input.jsx'
 import Button from '../UI/Button.jsx'
