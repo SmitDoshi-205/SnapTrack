@@ -1,4 +1,3 @@
-// client/src/App.jsx
 import { useState, useEffect } from 'react'
 import Navbar from './components/Navbar.jsx'
 import Column from './components/Kanban/Column.jsx'
