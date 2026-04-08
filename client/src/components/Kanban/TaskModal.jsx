@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import Input from '../UI/Input.jsx'
-import Button from '../UI/Button.jsx'
+import Input from '../UI/Input'
+import Button from '../UI/Button'
 
 function generateId() {
   return `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -11,12 +11,6 @@ const PRIORITY_OPTIONS = [
   { value: 'Medium', label: 'Medium' },
   { value: 'High',   label: 'High' },
 ]
-
-const PRIORITY_COLOR = {
-  High:   'red',
-  Medium: 'yellow',
-  Low:    'green',
-}
 
 const AVAILABLE_TAGS = [
   'UI', 'Backend', 'DB', 'Design',
