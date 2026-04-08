@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import Input from '../UI/Input.jsx'
 import Button from '../UI/Button.jsx'
-import Badge from '../UI/Badge.jsx'
 
 function generateId() {
   return `task-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
