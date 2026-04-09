@@ -10,12 +10,12 @@ import Navbar from "./components/Navbar.jsx";
 import Column from "./components/Kanban/Column.jsx";
 import TaskCard from "./components/Kanban/TaskCard.jsx";
 import TaskModal from "./components/Kanban/TaskModal.jsx";
-import { saveBoard, loadBoard } from "./store/boardStore.js";
+import Dashboard from "./Pages/Dashboard.jsx";
+import { saveBoards, loadBoards } from "./Store/boardStore.js";
 import { getInitialTheme, applyTheme } from "./Store/themeStore.js";
 
-{
-  /*Priority sort helper */
-}
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
 const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
 function sortByPriority(tasks) {
@@ -26,97 +26,153 @@ function sortByPriority(tasks) {
 }
 
 function sortAllColumns(columns) {
-  return columns.map((col) => ({
-    ...col,
-    tasks: sortByPriority(col.tasks),
-  }));
+  return columns.map((col) => ({ ...col, tasks: sortByPriority(col.tasks) }));
 }
 
-const DEFAULT_COLUMNS = [
+function generateId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function makeDefaultColumns() {
+  return [
+    {
+      id: `col-todo-${generateId()}`,
+      title: "To Do",
+      tasks: [],
+    },
+    {
+      id: `col-inprogress-${generateId()}`,
+      title: "In Progress",
+      tasks: [],
+    },
+    {
+      id: `col-done-${generateId()}`,
+      title: "Done",
+      tasks: [],
+    },
+  ];
+}
+
+// ─── seed data (only used when localStorage is empty) ─────────────────────────
+
+const SEED_BOARDS = [
   {
-    id: "todo",
-    title: "To Do",
-    tasks: [
+    id: "board-1",
+    name: "My First Board",
+    description: "Getting started with SnapTrack",
+    columns: [
       {
-        id: "1",
-        title: "Design the login page",
-        description: "Create wireframes and finalise the colour palette",
-        priority: "High",
-        tags: ["UI", "Design"],
-        dueDate: "2025-04-01",
+        id: "todo",
+        title: "To Do",
+        tasks: [
+          {
+            id: "1",
+            title: "Design the login page",
+            description: "Create wireframes and finalise the colour palette",
+            priority: "High",
+            tags: ["UI", "Design"],
+            dueDate: "2025-04-01",
+          },
+          {
+            id: "2",
+            title: "Set up Prisma schema",
+            description: "Define User, Board, Column, Task models",
+            priority: "High",
+            tags: ["Backend", "DB"],
+            dueDate: "2025-04-10",
+          },
+          {
+            id: "3",
+            title: "Write README",
+            description: null,
+            priority: "Low",
+            tags: ["Docs"],
+            dueDate: null,
+          },
+        ],
       },
       {
-        id: "2",
-        title: "Set up Prisma schema",
-        description: "Define User, Board, Column, Task models",
-        priority: "High",
-        tags: ["Backend", "DB"],
-        dueDate: "2025-04-10",
+        id: "inprogress",
+        title: "In Progress",
+        tasks: [
+          {
+            id: "4",
+            title: "Build Navbar component",
+            description: "Responsive navbar with logo, board name, user avatar",
+            priority: "Medium",
+            tags: ["UI"],
+            dueDate: "2025-04-05",
+          },
+        ],
       },
       {
-        id: "3",
-        title: "Write README",
-        description: null,
-        priority: "Low",
-        tags: ["Docs"],
-        dueDate: null,
-      },
-    ],
-  },
-  {
-    id: "inprogress",
-    title: "In Progress",
-    tasks: [
-      {
-        id: "4",
-        title: "Build Navbar component",
-        description: "Responsive navbar with logo, board name, user avatar",
-        priority: "Medium",
-        tags: ["UI"],
-        dueDate: "2025-04-05",
-      },
-    ],
-  },
-  {
-    id: "done",
-    title: "Done",
-    tasks: [
-      {
-        id: "5",
-        title: "Initialise Vite project",
-        description: "Set up React + Tailwind + folder structure",
-        priority: "Low",
-        tags: ["Setup"],
-        dueDate: null,
+        id: "done",
+        title: "Done",
+        tasks: [
+          {
+            id: "5",
+            title: "Initialise Vite project",
+            description: "Set up React + Tailwind + folder structure",
+            priority: "Low",
+            tags: ["Setup"],
+            dueDate: null,
+          },
+        ],
       },
     ],
   },
 ];
 
+// ─── App ──────────────────────────────────────────────────────────────────────
+
 function App() {
-  // getInitialTheme — checks localStorage then OS preference
+  // Theme
   const [isDark, setIsDark] = useState(getInitialTheme);
+  useEffect(() => { applyTheme(isDark); }, [isDark]);
+  function handleToggleTheme() { setIsDark((prev) => !prev); }
 
-  useEffect(() => {
-    applyTheme(isDark);
-  }, [isDark]);
+  // Boards — array of board objects, each with { id, name, description, columns }
+  const [boards, setBoards] = useState(() => loadBoards() || SEED_BOARDS);
 
-  function handleToggleTheme() {
-    setIsDark((prev) => !prev);
+  // Persist whenever boards change
+  useEffect(() => { saveBoards(boards); }, [boards]);
+
+  // Which board is open (null = Dashboard)
+  const [activeBoardId, setActiveBoardId] = useState(null);
+
+  // Derived: the board currently being viewed
+  const activeBoard = boards.find((b) => b.id === activeBoardId) ?? null;
+
+  // ── Board CRUD ──────────────────────────────────────────────────────────────
+
+  function handleCreateBoard({ name, description }) {
+    const newBoard = {
+      id: `board-${generateId()}`,
+      name,
+      description,
+      columns: makeDefaultColumns(),
+    };
+    setBoards((prev) => [...prev, newBoard]);
   }
 
-  {
-    /* Board state */
+  function handleDeleteBoard(boardId) {
+    setBoards((prev) => prev.filter((b) => b.id !== boardId));
+    if (activeBoardId === boardId) setActiveBoardId(null);
   }
-  const [columns, setColumns] = useState(() => loadBoard() || DEFAULT_COLUMNS);
 
-  useEffect(() => {
-    saveBoard(columns);
-  }, [columns]);
-
-  {
-    /* Modal state */
+  // Helper: update columns for the active board only
+  function updateActiveColumns(updater) {
+    setBoards((prev) =>
+      prev.map((b) =>
+        b.id === activeBoardId
+          ? { ...b, columns: updater(b.columns) }
+          : b,
+      ),
+    );
   }
+
+  // ── Modal state ─────────────────────────────────────────────────────────────
+
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [activeColId, setActiveColId] = useState(null);
@@ -140,16 +196,16 @@ function App() {
   }
 
   function handleAddNewTask(columnId, newTask) {
-    setColumns((prev) =>
-      prev.map((col) =>
+    updateActiveColumns((cols) =>
+      cols.map((col) =>
         col.id === columnId ? { ...col, tasks: [...col.tasks, newTask] } : col,
       ),
     );
   }
 
   function handleEditTask(updatedTask) {
-    setColumns((prev) =>
-      prev.map((col) =>
+    updateActiveColumns((cols) =>
+      cols.map((col) =>
         col.id === activeColId
           ? {
               ...col,
@@ -163,8 +219,8 @@ function App() {
   }
 
   function handleDeleteTask(taskId, columnId) {
-    setColumns((prev) =>
-      prev.map((col) =>
+    updateActiveColumns((cols) =>
+      cols.map((col) =>
         col.id === columnId
           ? { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) }
           : col,
@@ -172,122 +228,103 @@ function App() {
     );
   }
 
-  {
-    /* Drag and Drop */
-  }
+  // ── Drag and drop ───────────────────────────────────────────────────────────
 
-  // Track which task is currently being dragged
   const [draggingTask, setDraggingTask] = useState(null);
 
-  // PointerSensor — works for both mouse and touch
-  // activationConstraint means you need to drag 8px before it activates
-  // This prevents accidental drags when clicking to open the modal
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
   function handleDragStart(event) {
-    // Find and store the task being dragged
-    const task = columns
+    const task = activeBoard?.columns
       .flatMap((col) => col.tasks)
-      .find((t) => t.id === event.active.id)
-    setDraggingTask(task || null)
+      .find((t) => t.id === event.active.id);
+    setDraggingTask(task || null);
   }
 
   function handleDragEnd(event) {
-    setDraggingTask(null)
-    const { active, over } = event
+    setDraggingTask(null);
+    const { active, over } = event;
+    if (!over || !activeBoard) return;
 
-    // Dropped outside everything — do nothing
-    if (!over) return
+    const taskId = active.id;
+    const columns = activeBoard.columns;
 
-    const taskId = active.id
-
-    // Find the column the task is currently in
     const fromColumn = columns.find((col) =>
-      col.tasks.some((t) => t.id === taskId)
-    )
-    if (!fromColumn) return
+      col.tasks.some((t) => t.id === taskId),
+    );
+    if (!fromColumn) return;
 
-    // over.id could be either a column ID or a task ID
-    // if column ID 
-    const isOverColumn = columns.some((col) => col.id === over.id)
-
-    // if task ID
+    const isOverColumn = columns.some((col) => col.id === over.id);
     const toColumn = isOverColumn
       ? columns.find((col) => col.id === over.id)
-      : columns.find((col) => col.tasks.some((t) => t.id === over.id))
+      : columns.find((col) => col.tasks.some((t) => t.id === over.id));
 
-    // No valid destination found
-    if (!toColumn) return
+    if (!toColumn || fromColumn.id === toColumn.id) return;
 
-    // Same column 
-    if (fromColumn.id === toColumn.id) return
+    const task = fromColumn.tasks.find((t) => t.id === taskId);
 
-    // Different column — move the task across
-    const task = fromColumn.tasks.find((t) => t.id === taskId)
-
-    setColumns((prev) =>
+    updateActiveColumns((cols) =>
       sortAllColumns(
-        prev.map((col) => {
-          if (col.id === fromColumn.id) {
-            return { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) }
-          }
-          if (col.id === toColumn.id) {
-            return { ...col, tasks: [...col.tasks, task] }
-          }
-          return col
-        })
-      )
-    )
+        cols.map((col) => {
+          if (col.id === fromColumn.id)
+            return { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) };
+          if (col.id === toColumn.id)
+            return { ...col, tasks: [...col.tasks, task] };
+          return col;
+        }),
+      ),
+    );
   }
 
-  {
-    /* Render */
-  }
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200 overflow-hidden flex flex-col">
       <Navbar
-        boardName="My First Board"
+        boardName={activeBoard ? activeBoard.name : null}
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
+        onBack={activeBoard ? () => setActiveBoardId(null) : null}
       />
 
-      {/*
-        sensors — how drag is initiated (pointer/mouse/touch)
-        onDragStart — fires when user starts dragging
-        onDragEnd — fires when user releases
-      */}
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <main className="flex-1 p-6 overflow-x-auto">
-          <div className="flex gap-5 min-w-max">
-            {columns.map((column) => (
-              <Column
-                key={column.id}
-                column={column}
-                onAddTask={() => handleAddTask(column.id)}
-                onTaskClick={(task) => handleTaskClick(task, column.id)}
-              />
-            ))}
-          </div>
-        </main>
-
-        {/*
-          DragOverlay renders a floating copy of the card while dragging*/}
-        <DragOverlay>
-          {draggingTask ? (
-            <div className="rotate-2 opacity-95">
-              <TaskCard task={draggingTask} onClick={() => {}} />
+      {/* Dashboard or Kanban board */}
+      {!activeBoard ? (
+        <Dashboard
+          boards={boards}
+          onCreate={handleCreateBoard}
+          onOpen={setActiveBoardId}
+          onDelete={handleDeleteBoard}
+        />
+      ) : (
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <main className="flex-1 p-6 overflow-x-auto">
+            <div className="flex gap-5 min-w-max">
+              {activeBoard.columns.map((column) => (
+                <Column
+                  key={column.id}
+                  column={column}
+                  onAddTask={() => handleAddTask(column.id)}
+                  onTaskClick={(task) => handleTaskClick(task, column.id)}
+                />
+              ))}
             </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          </main>
+
+          <DragOverlay>
+            {draggingTask ? (
+              <div className="rotate-2 opacity-95">
+                <TaskCard task={draggingTask} onClick={() => {}} />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       <TaskModal
         isOpen={modalOpen}
