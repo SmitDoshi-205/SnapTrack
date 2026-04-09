@@ -1,6 +1,6 @@
 import ThemeToggle from './UI/ThemeToggle.jsx'
 
-function Navbar({ boardName, isDark, onToggleTheme }) {
+function Navbar({ boardName, isDark, onToggleTheme, onBack }) {
   return (
     <nav className="
       h-14
@@ -11,7 +11,7 @@ function Navbar({ boardName, isDark, onToggleTheme }) {
       transition-colors duration-200
     ">
 
-      {/* Left — logo + board name */}
+      {/* Left — logo + optional back + board name */}
       <div className="flex items-center gap-3">
         <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
           <span className="text-white text-xs font-bold">S</span>
@@ -19,6 +19,23 @@ function Navbar({ boardName, isDark, onToggleTheme }) {
         <span className="font-semibold text-gray-800 dark:text-gray-100">
           SnapTrack
         </span>
+
+        {onBack && (
+          <>
+            <span className="text-gray-300 dark:text-gray-600">/</span>
+            <button
+              onClick={onBack}
+              className="
+                text-sm text-gray-500 dark:text-gray-400
+                hover:text-blue-600 dark:hover:text-blue-400
+                transition-colors duration-150
+              "
+            >
+              Boards
+            </button>
+          </>
+        )}
+
         {boardName && (
           <>
             <span className="text-gray-300 dark:text-gray-600">/</span>
