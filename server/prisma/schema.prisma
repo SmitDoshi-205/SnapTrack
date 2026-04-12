@@ -9,7 +9,6 @@ datasource db {
 }
 
 // User 
-// Every person who signs up. One user can own and be a member of many boards.
 
 model User {
   id        String   @id @default(uuid())
