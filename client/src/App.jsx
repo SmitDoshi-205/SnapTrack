@@ -2,8 +2,14 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Dashboard from './Pages/Dashboard.jsx'
 import BoardView from './Pages/BoardView.jsx'
+import Login from './Pages/Login.jsx'
+import Register from './Pages/Register.jsx'
+import JoinBoard from './Pages/JoinBoard.jsx'
+import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { getInitialTheme, applyTheme } from './Store/themeStore.js'
 import { loadBoards, saveBoards } from './Store/boardStore.js'
+import { useAuthStore } from './Store/authStore.js'
+import { authApi } from './api/auth.api.js'
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -17,64 +23,55 @@ function makeDefaultColumns() {
   ]
 }
 
-const SEED_BOARDS = [
-  {
-    id: 'board-1',
-    name: 'My First Board',
-    description: 'Getting started with SnapTrack',
-    columns: [
-      {
-        id: 'todo',
-        title: 'To Do',
-        tasks: [
-          { id: '1', title: 'Design the login page',  description: 'Create wireframes and finalise the colour palette', priority: 'High',   tags: ['UI', 'Design'],   dueDate: '2025-04-01' },
-          { id: '2', title: 'Set up Prisma schema',   description: 'Define User, Board, Column, Task models',          priority: 'High',   tags: ['Backend', 'DB'],  dueDate: '2025-04-10' },
-          { id: '3', title: 'Write README',           description: null,                                               priority: 'Low',    tags: ['Docs'],           dueDate: null },
-        ],
-      },
-      {
-        id: 'inprogress',
-        title: 'In Progress',
-        tasks: [
-          { id: '4', title: 'Build Navbar component', description: 'Responsive navbar with logo, board name, user avatar', priority: 'Medium', tags: ['UI'], dueDate: '2025-04-05' },
-        ],
-      },
-      {
-        id: 'done',
-        title: 'Done',
-        tasks: [
-          { id: '5', title: 'Initialise Vite project', description: 'Set up React + Tailwind + folder structure', priority: 'Low', tags: ['Setup'], dueDate: null },
-        ],
-      },
-    ],
-  },
-]
-
 function App() {
-  // Theme — lives here because both pages need it
+  // ── Theme ──────────────────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState(getInitialTheme)
   useEffect(() => { applyTheme(isDark) }, [isDark])
   function handleToggleTheme() { setIsDark((prev) => !prev) }
 
-  // Boards — lives here so both pages share the same data
-  const [boards, setBoards]     = useState(() => loadBoards() || SEED_BOARDS)
-  const [isLoading, setIsLoading] = useState(true)
+  // ── Auth ───────────────────────────────────────────────────────────────────
+  const { user, setAuth, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(t)
+    async function checkAuth() {
+      const token = localStorage.getItem('accessToken')
+      if (!token) { setLoading(false); return }
+      try {
+        const { data } = await authApi.me()
+        setAuth(data.data.user, token)
+      } catch {
+        clearAuth()
+      }
+    }
+    checkAuth()
   }, [])
 
+  // ── Boards — load per user ─────────────────────────────────────────────────
+  const [boards, setBoards]       = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Reload boards whenever the logged-in user changes
   useEffect(() => {
-    if (!isLoading) saveBoards(boards)
-  }, [boards, isLoading])
+    if (!user) return
+    const t = setTimeout(() => {
+      const saved = loadBoards(user.id)
+      setBoards(saved || [])
+      setIsLoading(false)
+    }, 500)
+    return () => clearTimeout(t)
+  }, [user?.id])
+
+  // Save boards when they change
+  useEffect(() => {
+    if (!isLoading && user) saveBoards(boards, user.id)
+  }, [boards, isLoading, user])
 
   function handleCreateBoard({ name, description }) {
     const newBoard = {
-      id:      `board-${generateId()}`,
+      id:          `board-${generateId()}`,
       name,
       description,
-      columns: makeDefaultColumns(),
+      columns:     makeDefaultColumns(),
     }
     setBoards((prev) => [...prev, newBoard])
   }
@@ -91,32 +88,39 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/login"      element={<Login />} />
+      <Route path="/register"   element={<Register />} />
+      <Route path="/join/:code" element={<JoinBoard />} />
+
       <Route
         path="/"
         element={
-          <Dashboard
-            boards={boards}
-            isLoading={isLoading}
-            isDark={isDark}
-            onToggleTheme={handleToggleTheme}
-            onCreate={handleCreateBoard}
-            onDelete={handleDeleteBoard}
-          />
+          <ProtectedRoute>
+            <Dashboard
+              boards={boards}
+              isLoading={isLoading}
+              isDark={isDark}
+              onToggleTheme={handleToggleTheme}
+              onCreate={handleCreateBoard}
+              onDelete={handleDeleteBoard}
+            />
+          </ProtectedRoute>
         }
       />
       <Route
         path="/board/:boardId"
         element={
-          <BoardView
-            boards={boards}
-            isDark={isDark}
-            onToggleTheme={handleToggleTheme}
-            onUpdateBoard={handleUpdateBoard}
-            onDeleteBoard={handleDeleteBoard}
-          />
+          <ProtectedRoute>
+            <BoardView
+              boards={boards}
+              isDark={isDark}
+              onToggleTheme={handleToggleTheme}
+              onUpdateBoard={handleUpdateBoard}
+              onDeleteBoard={handleDeleteBoard}
+            />
+          </ProtectedRoute>
         }
       />
-      {/* Catch-all — unknown URLs go to dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
