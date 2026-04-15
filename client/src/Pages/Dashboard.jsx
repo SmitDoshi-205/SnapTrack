@@ -6,9 +6,10 @@ import SkeletonCard from '../components/UI/SkeletonCard.jsx'
 import Button from '../components/UI/Button.jsx'
 import Navbar from '../components/Navbar.jsx'
 
-function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelete, onJoinByCode }) {
+function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelete, onJoinByCode, onJoinByLink }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [joinMode, setJoinMode] = useState('code')
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState('')
   const [joining, setJoining] = useState(false)
@@ -16,7 +17,7 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
 
   async function handleJoinBoard() {
     if (!joinCode.trim()) {
-      setJoinError('Invite code is required')
+      setJoinError(joinMode === 'link' ? 'Invite link is required' : 'Invite code is required')
       return
     }
 
@@ -24,9 +25,13 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
     setJoinError('')
 
     try {
-      const boardId = await onJoinByCode(joinCode)
+      const boardId = joinMode === 'link'
+        ? await onJoinByLink(joinCode)
+        : await onJoinByCode(joinCode)
+
       setJoinModalOpen(false)
       setJoinCode('')
+      setJoinMode('code')
       if (boardId) {
         navigate(`/board/${boardId}`)
       }
@@ -186,16 +191,49 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
             </div>
 
             <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-2 bg-gray-100 dark:bg-gray-900 rounded-xl p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJoinMode('code')
+                    setJoinError('')
+                    setJoinCode('')
+                  }}
+                  className={`text-xs py-2 rounded-lg transition-colors ${
+                    joinMode === 'code'
+                      ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  Invite code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJoinMode('link')
+                    setJoinError('')
+                    setJoinCode('')
+                  }}
+                  className={`text-xs py-2 rounded-lg transition-colors ${
+                    joinMode === 'link'
+                      ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}
+                >
+                  Invite link
+                </button>
+              </div>
+
               <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                Invite code
+                {joinMode === 'link' ? 'Invite link' : 'Invite code'}
               </label>
               <input
                 value={joinCode}
                 onChange={(e) => {
-                  setJoinCode(e.target.value.toUpperCase())
+                  setJoinCode(joinMode === 'code' ? e.target.value.toUpperCase() : e.target.value)
                   setJoinError('')
                 }}
-                placeholder="SNAP-XXXX"
+                placeholder={joinMode === 'link' ? 'https://your-app/join/SNAP-XXXX' : 'SNAP-XXXX'}
                 className="h-10 rounded-xl px-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -214,7 +252,7 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleJoinBoard} disabled={joining}>
-                {joining ? 'Joining...' : 'Join board'}
+                {joining ? 'Joining...' : 'Join'}
               </Button>
             </div>
           </div>

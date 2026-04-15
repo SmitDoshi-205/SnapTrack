@@ -18,12 +18,12 @@ router.use(protect)
 
 const createBoardSchema = z.object({
   name:        z.string().min(2).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).optional().nullable(),
 })
 
 const updateBoardSchema = z.object({
   name:        z.string().min(2).max(100).optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).optional().nullable(),
 })
 
 router.get('/',                      getBoards)
