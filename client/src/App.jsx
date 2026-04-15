@@ -24,12 +24,12 @@ function makeDefaultColumns() {
 }
 
 function App() {
-  // ── Theme ──────────────────────────────────────────────────────────────────
+  //  Theme 
   const [isDark, setIsDark] = useState(getInitialTheme)
   useEffect(() => { applyTheme(isDark) }, [isDark])
   function handleToggleTheme() { setIsDark((prev) => !prev) }
 
-  // ── Auth ───────────────────────────────────────────────────────────────────
+  //  Auth 
   const { user, setAuth, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function App() {
     checkAuth()
   }, [])
 
-  // ── Boards — load per user ─────────────────────────────────────────────────
+  //  Boards 
   const [boards, setBoards]       = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
