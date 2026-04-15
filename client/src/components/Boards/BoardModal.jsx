@@ -6,6 +6,7 @@ function BoardModal({ isOpen, onClose, onCreate }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -15,13 +16,23 @@ function BoardModal({ isOpen, onClose, onCreate }) {
     }
   }, [isOpen]);
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!name.trim()) {
       setError("Board name is required");
       return;
     }
-    onCreate({ name: name.trim(), description: description.trim() || null });
-    onClose();
+
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      await onCreate({ name: name.trim(), description: description.trim() || undefined });
+      onClose();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "Failed to create board");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (!isOpen) return null;
@@ -78,8 +89,8 @@ function BoardModal({ isOpen, onClose, onCreate }) {
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleCreate}>
-            Create board
+          <Button variant="primary" onClick={handleCreate} disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create board"}
           </Button>
         </div>
       </div>
