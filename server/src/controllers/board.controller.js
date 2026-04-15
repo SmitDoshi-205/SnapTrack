@@ -1,4 +1,5 @@
 import prisma from '../config/db.js'
+import { emitBoardEvent } from '../realtime/socket.js'
 
 //  Helpers 
 
@@ -31,7 +32,17 @@ export async function getBoards(req, res, next) {
         board: {
           include: {
             columns: {
-              include: { tasks: true },
+              include: {
+                tasks: {
+                  include: {
+                    assignee: {
+                      select: { id: true, name: true, avatarUrl: true },
+                    },
+                    tags: { include: { tag: true } },
+                  },
+                  orderBy: { position: 'asc' },
+                },
+              },
               orderBy: { position: 'asc' },
             },
             members: {
@@ -166,6 +177,7 @@ export async function createBoard(req, res, next) {
     })
 
     res.status(201).json({ success: true, data: { board: fullBoard } })
+    emitBoardEvent(board.id, 'board:changed', { reason: 'board-created' })
   } catch (err) {
     next(err)
   }
@@ -195,6 +207,7 @@ export async function updateBoard(req, res, next) {
     })
 
     res.json({ success: true, data: { board: updated } })
+    emitBoardEvent(id, 'board:changed', { reason: 'board-updated' })
   } catch (err) {
     next(err)
   }
@@ -220,6 +233,7 @@ export async function deleteBoard(req, res, next) {
     await prisma.board.delete({ where: { id } })
 
     res.json({ success: true, message: 'Board deleted' })
+    emitBoardEvent(id, 'board:deleted', { reason: 'board-deleted' })
   } catch (err) {
     next(err)
   }
@@ -269,6 +283,7 @@ export async function joinBoard(req, res, next) {
       message: 'Joined board successfully',
       data:    { boardId: board.id },
     })
+    emitBoardEvent(board.id, 'board:changed', { reason: 'member-joined' })
   } catch (err) {
     next(err)
   }
@@ -305,6 +320,7 @@ export async function removeMember(req, res, next) {
     })
 
     res.json({ success: true, message: 'Member removed' })
+    emitBoardEvent(id, 'board:changed', { reason: 'member-removed' })
   } catch (err) {
     next(err)
   }

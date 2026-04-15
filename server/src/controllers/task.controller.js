@@ -1,4 +1,5 @@
 import prisma from '../config/db.js'
+import { emitBoardEvent } from '../realtime/socket.js'
 
 // Helper 
 
@@ -12,6 +13,29 @@ async function requireBoardMembership(columnId, userId) {
 
   const isMember = column.board.members.some((m) => m.userId === userId)
   return isMember ? column : null
+}
+
+function normalizeTags(tags) {
+  return [...new Set((tags || []).map((tag) => String(tag).trim()).filter(Boolean))]
+}
+
+function buildTaskTagCreates(boardId, tags) {
+  return tags.map((tagName) => ({
+    tag: {
+      connectOrCreate: {
+        where: {
+          boardId_name: {
+            boardId,
+            name: tagName,
+          },
+        },
+        create: {
+          boardId,
+          name: tagName,
+        },
+      },
+    },
+  }))
 }
 
 // Create task 
@@ -33,6 +57,8 @@ export async function createTask(req, res, next) {
     })
     const position = lastTask ? lastTask.position + 1000 : 0
 
+    const normalizedTags = normalizeTags(tags)
+
     const task = await prisma.task.create({
       data: {
         columnId,
@@ -43,12 +69,9 @@ export async function createTask(req, res, next) {
         assignedTo: assignedTo || null,
         createdBy:  req.user.id,
         position,
-        // Create tag connections if tags were provided
-        tags: tags?.length
+        tags: normalizedTags.length
           ? {
-              create: tags.map((tagId) => ({
-                tag: { connect: { id: tagId } },
-              })),
+              create: buildTaskTagCreates(column.boardId, normalizedTags),
             }
           : undefined,
       },
@@ -59,6 +82,7 @@ export async function createTask(req, res, next) {
     })
 
     res.status(201).json({ success: true, data: { task } })
+    emitBoardEvent(column.boardId, 'board:changed', { reason: 'task-created' })
   } catch (err) {
     next(err)
   }
@@ -73,6 +97,9 @@ export async function getTask(req, res, next) {
     const task = await prisma.task.findUnique({
       where:   { id },
       include: {
+        column: {
+          select: { boardId: true },
+        },
         assignee:    { select: { id: true, name: true, avatarUrl: true } },
         creator:     { select: { id: true, name: true } },
         tags:        { include: { tag: true } },
@@ -90,7 +117,22 @@ export async function getTask(req, res, next) {
       return res.status(404).json({ success: false, message: 'Task not found' })
     }
 
-    res.json({ success: true, data: { task } })
+    const membership = await prisma.boardMember.findUnique({
+      where: {
+        boardId_userId: {
+          boardId: task.column.boardId,
+          userId: req.user.id,
+        },
+      },
+    })
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'Access denied' })
+    }
+
+    const { column, ...safeTask } = task
+
+    res.json({ success: true, data: { task: safeTask } })
   } catch (err) {
     next(err)
   }
@@ -117,10 +159,7 @@ export async function updateTask(req, res, next) {
       return res.status(403).json({ success: false, message: 'Access denied' })
     }
 
-    // If tags provided, delete existing and recreate
-    if (tags !== undefined) {
-      await prisma.taskTag.deleteMany({ where: { taskId: id } })
-    }
+    const normalizedTags = tags !== undefined ? normalizeTags(tags) : null
 
     const updated = await prisma.task.update({
       where: { id },
@@ -130,13 +169,13 @@ export async function updateTask(req, res, next) {
         priority,
         dueDate:    dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : undefined,
         assignedTo: assignedTo !== undefined ? assignedTo : undefined,
-        tags: tags?.length
-          ? {
-              create: tags.map((tagId) => ({
-                tag: { connect: { id: tagId } },
-              })),
-            }
-          : undefined,
+        tags:
+          normalizedTags === null
+            ? undefined
+            : {
+                deleteMany: {},
+                create: buildTaskTagCreates(task.column.boardId, normalizedTags),
+              },
       },
       include: {
         assignee: { select: { id: true, name: true, avatarUrl: true } },
@@ -145,6 +184,7 @@ export async function updateTask(req, res, next) {
     })
 
     res.json({ success: true, data: { task: updated } })
+    emitBoardEvent(task.column.boardId, 'board:changed', { reason: 'task-updated' })
   } catch (err) {
     next(err)
   }
@@ -181,6 +221,7 @@ export async function deleteTask(req, res, next) {
     await prisma.task.delete({ where: { id } })
 
     res.json({ success: true, message: 'Task deleted' })
+    emitBoardEvent(task.column.boardId, 'board:changed', { reason: 'task-deleted' })
   } catch (err) {
     next(err)
   }
@@ -207,12 +248,25 @@ export async function moveTask(req, res, next) {
       return res.status(403).json({ success: false, message: 'Access denied' })
     }
 
+    const targetColumn = await prisma.column.findUnique({ where: { id: columnId } })
+    if (!targetColumn) {
+      return res.status(404).json({ success: false, message: 'Target column not found' })
+    }
+
+    if (targetColumn.boardId !== task.column.boardId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task can only be moved within the same board',
+      })
+    }
+
     const updated = await prisma.task.update({
       where: { id },
       data:  { columnId, position },
     })
 
     res.json({ success: true, data: { task: updated } })
+    emitBoardEvent(task.column.boardId, 'board:changed', { reason: 'task-moved' })
   } catch (err) {
     next(err)
   }
