@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Dashboard from './Pages/Dashboard.jsx'
 import BoardView from './Pages/BoardView.jsx'
 import Login from './Pages/Login.jsx'
@@ -7,30 +7,65 @@ import Register from './Pages/Register.jsx'
 import JoinBoard from './Pages/JoinBoard.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import { getInitialTheme, applyTheme } from './Store/themeStore.js'
-import { loadBoards, saveBoards } from './Store/boardStore.js'
 import { useAuthStore } from './Store/authStore.js'
 import { authApi } from './api/auth.api.js'
+import { boardApi } from './api/board.api.js'
+import { io } from 'socket.io-client'
 
-function generateId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+function normalizeTask(task) {
+  return {
+    ...task,
+    tags: Array.isArray(task.tags)
+      ? task.tags
+          .map((t) => (typeof t === 'string' ? t : t?.tag?.name))
+          .filter(Boolean)
+      : [],
+  }
 }
 
-function makeDefaultColumns() {
-  return [
-    { id: `col-todo-${generateId()}`,       title: 'To Do',       tasks: [] },
-    { id: `col-inprogress-${generateId()}`, title: 'In Progress', tasks: [] },
-    { id: `col-done-${generateId()}`,       title: 'Done',        tasks: [] },
-  ]
+function normalizeBoard(board) {
+  return {
+    ...board,
+    columns: (board.columns || []).map((column) => ({
+      ...column,
+      tasks: (column.tasks || []).map(normalizeTask),
+    })),
+  }
+}
+
+function normalizeInviteCode(value = '') {
+  return value.trim().toUpperCase()
+}
+
+function extractInviteCode(input) {
+  const raw = (input || '').trim()
+  if (!raw) return ''
+
+  try {
+    const url = new URL(raw)
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (parts[0]?.toLowerCase() === 'join' && parts[1]) {
+      return normalizeInviteCode(parts[1])
+    }
+  } catch {
+    // Not a URL. treat as invite code.
+  }
+
+  return normalizeInviteCode(raw)
 }
 
 function App() {
+  const location = useLocation()
+  const socketRef = useRef(null)
+  const joinedBoardIdsRef = useRef([])
+
   //  Theme 
   const [isDark, setIsDark] = useState(getInitialTheme)
   useEffect(() => { applyTheme(isDark) }, [isDark])
   function handleToggleTheme() { setIsDark((prev) => !prev) }
 
   //  Auth 
-  const { user, setAuth, clearAuth, setLoading } = useAuthStore()
+  const { user, accessToken, setAuth, clearAuth, setLoading } = useAuthStore()
 
   useEffect(() => {
     async function checkAuth() {
@@ -50,39 +85,241 @@ function App() {
   const [boards, setBoards]       = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Reload boards whenever the logged-in user changes
-  useEffect(() => {
+  async function fetchBoards() {
     if (!user) return
-    const t = setTimeout(() => {
-      const saved = loadBoards(user.id)
-      setBoards(saved || [])
-      setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(t)
-  }, [user?.id])
 
-  // Save boards when they change
-  useEffect(() => {
-    if (!isLoading && user) saveBoards(boards, user.id)
-  }, [boards, isLoading, user])
-
-  function handleCreateBoard({ name, description }) {
-    const newBoard = {
-      id:          `board-${generateId()}`,
-      name,
-      description,
-      columns:     makeDefaultColumns(),
-    }
-    setBoards((prev) => [...prev, newBoard])
+    const { data } = await boardApi.getAll()
+    const nextBoards = (data.data.boards || []).map(normalizeBoard)
+    setBoards(nextBoards)
   }
 
-  function handleDeleteBoard(boardId) {
+  async function refreshBoard(boardId) {
+    const { data } = await boardApi.getOne(boardId)
+    const normalized = normalizeBoard(data.data.board)
+    setBoards((prev) => prev.map((b) => (b.id === boardId ? normalized : b)))
+  }
+
+  useEffect(() => {
+    let active = true
+
+    async function loadBoards() {
+      if (!user) {
+        setBoards([])
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        const { data } = await boardApi.getAll()
+        if (!active) return
+        const nextBoards = (data.data.boards || []).map(normalizeBoard)
+        setBoards(nextBoards)
+      } catch {
+        if (active) setBoards([])
+      } finally {
+        if (active) setIsLoading(false)
+      }
+    }
+
+    loadBoards()
+    return () => { active = false }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return undefined
+
+    const id = setInterval(() => {
+      fetchBoards().catch(() => {})
+    }, 8000)
+
+    return () => clearInterval(id)
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!accessToken) return undefined
+
+    const socket = io(import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000', {
+      auth: { token: accessToken },
+      withCredentials: true,
+    })
+
+    socketRef.current = socket
+
+    socket.on('board:changed', async ({ boardId }) => {
+      if (!boardId) return
+      try {
+        await refreshBoard(boardId)
+      } catch {
+        // If the board was removed or inaccessible, drop it from local state.
+        setBoards((prev) => prev.filter((board) => board.id !== boardId))
+      }
+    })
+
+    socket.on('board:deleted', ({ boardId }) => {
+      if (!boardId) return
+      setBoards((prev) => prev.filter((board) => board.id !== boardId))
+    })
+
+    return () => {
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [user?.id, accessToken])
+
+  useEffect(() => {
+    const socket = socketRef.current
+    if (!socket) return
+
+    const currentIds = boards.map((board) => board.id).filter(Boolean)
+    const previousIds = joinedBoardIdsRef.current
+
+    const toJoin = currentIds.filter((id) => !previousIds.includes(id))
+    const toLeave = previousIds.filter((id) => !currentIds.includes(id))
+
+    if (toJoin.length) socket.emit('boards:join', toJoin)
+    if (toLeave.length) socket.emit('boards:leave', toLeave)
+
+    joinedBoardIdsRef.current = currentIds
+  }, [boards])
+
+  useEffect(() => {
+    if (!user) return
+    fetchBoards().catch(() => {})
+  }, [location.pathname, user?.id])
+
+  async function handleCreateBoard({ name, description }) {
+    const { data } = await boardApi.create({ name, description })
+    const created = normalizeBoard(data.data.board)
+    setBoards((prev) => [...prev, created])
+    return created
+  }
+
+  async function handleDeleteBoard(boardId) {
+    await boardApi.delete(boardId)
     setBoards((prev) => prev.filter((b) => b.id !== boardId))
+  }
+
+  async function handleJoinByCode(code) {
+    const cleaned = extractInviteCode(code)
+    if (!cleaned) throw new Error('Invite code is required')
+
+    const { data } = await boardApi.join(cleaned)
+    await fetchBoards()
+    return data.data.boardId
+  }
+
+  async function handleJoinByLink(link) {
+    const cleaned = extractInviteCode(link)
+    if (!cleaned) throw new Error('Invite link is invalid')
+    return handleJoinByCode(cleaned)
   }
 
   function handleUpdateBoard(boardId, updatedColumns) {
     setBoards((prev) =>
-      prev.map((b) => b.id === boardId ? { ...b, columns: updatedColumns } : b)
+      prev.map((b) => (b.id === boardId ? { ...b, columns: updatedColumns } : b))
+    )
+  }
+
+  async function handleCreateTask(boardId, columnId, taskPayload) {
+    const { data } = await boardApi.createTask(columnId, taskPayload)
+    const createdTask = normalizeTask(data.data.task)
+
+    setBoards((prev) =>
+      prev.map((board) => {
+        if (board.id !== boardId) return board
+
+        return {
+          ...board,
+          columns: board.columns.map((column) =>
+            column.id === columnId
+              ? { ...column, tasks: [...column.tasks, createdTask] }
+              : column
+          ),
+        }
+      })
+    )
+
+    return createdTask
+  }
+
+  async function handleUpdateTask(boardId, taskId, taskPayload) {
+    const { data } = await boardApi.updateTask(taskId, taskPayload)
+    const updatedTask = normalizeTask(data.data.task)
+
+    setBoards((prev) =>
+      prev.map((board) => {
+        if (board.id !== boardId) return board
+
+        return {
+          ...board,
+          columns: board.columns.map((column) => ({
+            ...column,
+            tasks: column.tasks.map((task) =>
+              task.id === taskId ? { ...task, ...updatedTask } : task
+            ),
+          })),
+        }
+      })
+    )
+
+    return updatedTask
+  }
+
+  async function handleDeleteTask(boardId, taskId) {
+    await boardApi.deleteTask(taskId)
+
+    setBoards((prev) =>
+      prev.map((board) => {
+        if (board.id !== boardId) return board
+
+        return {
+          ...board,
+          columns: board.columns.map((column) => ({
+            ...column,
+            tasks: column.tasks.filter((task) => task.id !== taskId),
+          })),
+        }
+      })
+    )
+  }
+
+  async function handleMoveTask(boardId, taskId, movePayload) {
+    await boardApi.moveTask(taskId, movePayload)
+
+    setBoards((prev) =>
+      prev.map((board) => {
+        if (board.id !== boardId) return board
+
+        let movedTask = null
+
+        const columnsWithoutTask = board.columns.map((column) => {
+          const task = column.tasks.find((t) => t.id === taskId)
+          if (task) movedTask = task
+
+          return {
+            ...column,
+            tasks: column.tasks.filter((t) => t.id !== taskId),
+          }
+        })
+
+        if (!movedTask) return board
+
+        return {
+          ...board,
+          columns: columnsWithoutTask.map((column) =>
+            column.id === movePayload.columnId
+              ? {
+                  ...column,
+                  tasks: [
+                    ...column.tasks,
+                    { ...movedTask, columnId: movePayload.columnId },
+                  ],
+                }
+              : column
+          ),
+        }
+      })
     )
   }
 
@@ -103,6 +340,8 @@ function App() {
               onToggleTheme={handleToggleTheme}
               onCreate={handleCreateBoard}
               onDelete={handleDeleteBoard}
+              onJoinByCode={handleJoinByCode}
+              onJoinByLink={handleJoinByLink}
             />
           </ProtectedRoute>
         }
@@ -113,10 +352,15 @@ function App() {
           <ProtectedRoute>
             <BoardView
               boards={boards}
+              isLoading={isLoading}
               isDark={isDark}
               onToggleTheme={handleToggleTheme}
               onUpdateBoard={handleUpdateBoard}
               onDeleteBoard={handleDeleteBoard}
+              onCreateTask={handleCreateTask}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onMoveTask={handleMoveTask}
             />
           </ProtectedRoute>
         }

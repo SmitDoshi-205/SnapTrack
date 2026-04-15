@@ -1,19 +1,23 @@
-const STORAGE_KEY = "snaptrack-boards";
+function storageKey(userId) {
+  return `snaptrack-boards-${userId}`
+}
 
-export function saveBoards(boards) {
+export function saveBoards(boards, userId) {
+  if (!userId) return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
+    localStorage.setItem(storageKey(userId), JSON.stringify(boards))
   } catch (e) {
-    console.error("Failed to save boards:", e);
+    console.error('Failed to save boards:', e)
   }
 }
 
-export function loadBoards() {
+export function loadBoards(userId) {
+  if (!userId) return null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const raw = localStorage.getItem(storageKey(userId))
+    return raw ? JSON.parse(raw) : null
   } catch (e) {
-    console.error("Failed to load boards:", e);
-    return null;
+    console.error('Failed to load boards:', e)
+    return null
   }
 }
