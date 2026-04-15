@@ -4,42 +4,46 @@ import BoardCard from '../components/Boards/BoardCard.jsx'
 import BoardModal from '../components/Boards/BoardModal.jsx'
 import SkeletonCard from '../components/UI/SkeletonCard.jsx'
 import Button from '../components/UI/Button.jsx'
-import ThemeToggle from '../components/UI/ThemeToggle.jsx'
+import Navbar from '../components/Navbar.jsx'
 
-function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelete }) {
+function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelete, onJoinByCode }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
+  const [joinError, setJoinError] = useState('')
+  const [joining, setJoining] = useState(false)
   const navigate = useNavigate()
 
-  return (
-    <div className="
-      min-h-screen
-      bg-gray-100 dark:bg-gray-900
-      transition-colors duration-200
-    ">
-      {/* Navbar */}
-      <nav className="
-        h-14 bg-white dark:bg-gray-800
-        border-b border-gray-200 dark:border-gray-700
-        flex items-center justify-between px-6
-      ">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-xs font-bold">S</span>
-          </div>
-          <span className="font-semibold text-gray-800 dark:text-gray-100">
-            SnapTrack
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle isDark={isDark} onToggle={onToggleTheme} />
-          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-            <span className="text-blue-600 dark:text-blue-300 text-xs font-semibold">U</span>
-          </div>
-        </div>
-      </nav>
+  async function handleJoinBoard() {
+    if (!joinCode.trim()) {
+      setJoinError('Invite code is required')
+      return
+    }
 
-      {/* Content */}
-      <div className="p-8">
+    setJoining(true)
+    setJoinError('')
+
+    try {
+      const boardId = await onJoinByCode(joinCode)
+      setJoinModalOpen(false)
+      setJoinCode('')
+      if (boardId) {
+        navigate(`/board/${boardId}`)
+      }
+    } catch (err) {
+      setJoinError(err.response?.data?.message || 'Failed to join board')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200 flex flex-col">
+
+      {/* Shared Navbar */}
+      <Navbar isDark={isDark} onToggleTheme={onToggleTheme} />
+
+      <div className="flex-1 p-8 overflow-y-auto">
         {/* Page header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -47,12 +51,20 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
               My boards
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {isLoading ? '' : `${boards.length} ${boards.length === 1 ? 'board' : 'boards'}`}
+              {isLoading
+                ? ''
+                : `${boards.length} ${boards.length === 1 ? 'board' : 'boards'}`
+              }
             </p>
           </div>
-          <Button variant="primary" onClick={() => setModalOpen(true)}>
-            + New board
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setJoinModalOpen(true)}>
+              Join with code
+            </Button>
+            <Button variant="primary" onClick={() => setModalOpen(true)}>
+              + New board
+            </Button>
+          </div>
         </div>
 
         {/* Loading skeletons */}
@@ -67,18 +79,36 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
         {/* Empty state */}
         {!isLoading && boards.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                className="text-gray-400 dark:text-gray-600">
+            <div className="
+              w-16 h-16 rounded-2xl
+              bg-blue-50 dark:bg-blue-900/20
+              flex items-center justify-center
+            ">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="28" height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-blue-400"
+              >
                 <rect x="3"  y="3"  width="7" height="9" rx="1"/>
                 <rect x="14" y="3"  width="7" height="5" rx="1"/>
                 <rect x="14" y="12" width="7" height="9" rx="1"/>
                 <rect x="3"  y="16" width="7" height="5" rx="1"/>
               </svg>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">No boards yet</p>
+            <div className="text-center">
+              <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                No boards yet
+              </h2>
+              <p className="text-sm text-gray-400 dark:text-gray-500 max-w-xs">
+                Create your first board to start tracking tasks
+              </p>
+            </div>
             <Button variant="primary" onClick={() => setModalOpen(true)}>
               Create your first board
             </Button>
@@ -123,6 +153,73 @@ function Dashboard({ boards, isLoading, isDark, onToggleTheme, onCreate, onDelet
         onClose={() => setModalOpen(false)}
         onCreate={onCreate}
       />
+
+      {joinModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => {
+            if (!joining) {
+              setJoinModalOpen(false)
+              setJoinError('')
+            }
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6 flex flex-col gap-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+                Join board
+              </h2>
+              <button
+                onClick={() => {
+                  if (!joining) {
+                    setJoinModalOpen(false)
+                    setJoinError('')
+                  }
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                Invite code
+              </label>
+              <input
+                value={joinCode}
+                onChange={(e) => {
+                  setJoinCode(e.target.value.toUpperCase())
+                  setJoinError('')
+                }}
+                placeholder="SNAP-XXXX"
+                className="h-10 rounded-xl px-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {joinError && <p className="text-xs text-red-500">{joinError}</p>}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setJoinModalOpen(false)
+                  setJoinError('')
+                }}
+                disabled={joining}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleJoinBoard} disabled={joining}>
+                {joining ? 'Joining...' : 'Join board'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
