@@ -33,6 +33,7 @@ function TaskModal({
   const [dueDate, setDueDate]         = useState('')
   const [tags, setTags]               = useState([])
   const [error, setError]             = useState('')
+  const [isSaving, setIsSaving]       = useState(false)
 
   useEffect(() => {
     if (task) {
@@ -51,6 +52,7 @@ function TaskModal({
       setTags([])
     }
     setError('')
+    setIsSaving(false)
   }, [task, isOpen]) 
 
   function handleTagToggle(tag) {
@@ -61,7 +63,7 @@ function TaskModal({
     )
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       setError('Task title is required')
       return
@@ -70,25 +72,43 @@ function TaskModal({
     const taskData = {
       id:          task?.id || generateId(),
       title:       title.trim(),
-      description: description.trim() || null,
+      description: description.trim() || undefined,
       priority,
-      dueDate:     dueDate || null,
+      dueDate:     dueDate || undefined,
       tags,
     }
 
-    if (task) {
-      onEdit(taskData)
-    } else {
-      onAdd(columnId, taskData)
-    }
+    setError('')
+    setIsSaving(true)
 
-    onClose()
+    try {
+      if (task) {
+        await onEdit(taskData)
+      } else {
+        await onAdd(columnId, taskData)
+      }
+
+      onClose()
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to save task')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (window.confirm('Delete this task? This cannot be undone.')) {
-      onDelete(task.id, columnId)
-      onClose()
+      setError('')
+      setIsSaving(true)
+
+      try {
+        await onDelete(task.id, columnId)
+        onClose()
+      } catch (err) {
+        setError(err?.response?.data?.message || err?.message || 'Failed to delete task')
+      } finally {
+        setIsSaving(false)
+      }
     }
   }
 
@@ -188,19 +208,19 @@ function TaskModal({
 
         <div className="flex items-center justify-between pt-1">
           {isEditMode ? (
-            <Button variant="danger" onClick={handleDelete}>
-              Delete
+            <Button variant="danger" onClick={handleDelete} disabled={isSaving}>
+              {isSaving ? 'Deleting...' : 'Delete'}
             </Button>
           ) : (
             <div /> 
           )}
 
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose} disabled={isSaving}>
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleSave}>
-              {isEditMode ? 'Save changes' : 'Add task'}
+            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : (isEditMode ? 'Save changes' : 'Add task')}
             </Button>
           </div>
         </div>

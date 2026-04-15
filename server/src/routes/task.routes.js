@@ -16,10 +16,10 @@ router.use(protect);
 
 const createTaskSchema = z.object({
   title: z.string().min(1).max(200),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).optional().nullable(),
   priority: z.enum(["Low", "Medium", "High"]).optional(),
-  dueDate: z.string().optional(),
-  assignedTo: z.string().optional(),
+  dueDate: z.string().optional().nullable(),
+  assignedTo: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
 });
 
