@@ -12,6 +12,23 @@ import { authApi } from './api/auth.api.js'
 import { boardApi } from './api/board.api.js'
 import { io } from 'socket.io-client'
 
+const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 }
+
+function sortTasksByPriority(tasks = []) {
+  return [...tasks].sort(
+    (a, b) =>
+      (PRIORITY_ORDER[a.priority] ?? Number.MAX_SAFE_INTEGER) -
+      (PRIORITY_ORDER[b.priority] ?? Number.MAX_SAFE_INTEGER)
+  )
+}
+
+function sortColumnsByTaskPriority(columns = []) {
+  return columns.map((column) => ({
+    ...column,
+    tasks: sortTasksByPriority(column.tasks || []),
+  }))
+}
+
 function normalizeTask(task) {
   return {
     ...task,
@@ -30,6 +47,14 @@ function normalizeBoard(board) {
       ...column,
       tasks: (column.tasks || []).map(normalizeTask),
     })),
+  }
+}
+
+function normalizeAndSortBoard(board) {
+  const normalized = normalizeBoard(board)
+  return {
+    ...normalized,
+    columns: sortColumnsByTaskPriority(normalized.columns || []),
   }
 }
 
@@ -58,6 +83,8 @@ function App() {
   const location = useLocation()
   const socketRef = useRef(null)
   const joinedBoardIdsRef = useRef([])
+  const fetchBoardsReqIdRef = useRef(0)
+  const refreshBoardReqIdRef = useRef({})
 
   //  Theme 
   const [isDark, setIsDark] = useState(getInitialTheme)
@@ -88,14 +115,23 @@ function App() {
   async function fetchBoards() {
     if (!user) return
 
+    const requestId = ++fetchBoardsReqIdRef.current
+
     const { data } = await boardApi.getAll()
-    const nextBoards = (data.data.boards || []).map(normalizeBoard)
+    if (requestId !== fetchBoardsReqIdRef.current) return
+
+    const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard)
     setBoards(nextBoards)
   }
 
   async function refreshBoard(boardId) {
+    const nextRequestId = (refreshBoardReqIdRef.current[boardId] || 0) + 1
+    refreshBoardReqIdRef.current[boardId] = nextRequestId
+
     const { data } = await boardApi.getOne(boardId)
-    const normalized = normalizeBoard(data.data.board)
+    if (refreshBoardReqIdRef.current[boardId] !== nextRequestId) return
+
+    const normalized = normalizeAndSortBoard(data.data.board)
     setBoards((prev) => prev.map((b) => (b.id === boardId ? normalized : b)))
   }
 
@@ -113,7 +149,7 @@ function App() {
         setIsLoading(true)
         const { data } = await boardApi.getAll()
         if (!active) return
-        const nextBoards = (data.data.boards || []).map(normalizeBoard)
+        const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard)
         setBoards(nextBoards)
       } catch {
         if (active) setBoards([])
@@ -128,13 +164,14 @@ function App() {
 
   useEffect(() => {
     if (!user) return undefined
+    if (/^\/board\/[^/]+/.test(location.pathname)) return undefined
 
     const id = setInterval(() => {
       fetchBoards().catch(() => {})
     }, 8000)
 
     return () => clearInterval(id)
-  }, [user?.id])
+  }, [user?.id, location.pathname])
 
   useEffect(() => {
     if (!accessToken) return undefined
@@ -217,7 +254,11 @@ function App() {
 
   function handleUpdateBoard(boardId, updatedColumns) {
     setBoards((prev) =>
-      prev.map((b) => (b.id === boardId ? { ...b, columns: updatedColumns } : b))
+      prev.map((b) =>
+        b.id === boardId
+          ? { ...b, columns: sortColumnsByTaskPriority(updatedColumns || []) }
+          : b
+      )
     )
   }
 
@@ -233,7 +274,10 @@ function App() {
           ...board,
           columns: board.columns.map((column) =>
             column.id === columnId
-              ? { ...column, tasks: [...column.tasks, createdTask] }
+              ? {
+                  ...column,
+                  tasks: sortTasksByPriority([...column.tasks, createdTask]),
+                }
               : column
           ),
         }
@@ -253,12 +297,16 @@ function App() {
 
         return {
           ...board,
-          columns: board.columns.map((column) => ({
-            ...column,
-            tasks: column.tasks.map((task) =>
+          columns: board.columns.map((column) => {
+            const nextTasks = column.tasks.map((task) =>
               task.id === taskId ? { ...task, ...updatedTask } : task
-            ),
-          })),
+            )
+
+            return {
+              ...column,
+              tasks: sortTasksByPriority(nextTasks),
+            }
+          }),
         }
       })
     )
@@ -287,40 +335,8 @@ function App() {
   async function handleMoveTask(boardId, taskId, movePayload) {
     await boardApi.moveTask(taskId, movePayload)
 
-    setBoards((prev) =>
-      prev.map((board) => {
-        if (board.id !== boardId) return board
-
-        let movedTask = null
-
-        const columnsWithoutTask = board.columns.map((column) => {
-          const task = column.tasks.find((t) => t.id === taskId)
-          if (task) movedTask = task
-
-          return {
-            ...column,
-            tasks: column.tasks.filter((t) => t.id !== taskId),
-          }
-        })
-
-        if (!movedTask) return board
-
-        return {
-          ...board,
-          columns: columnsWithoutTask.map((column) =>
-            column.id === movePayload.columnId
-              ? {
-                  ...column,
-                  tasks: [
-                    ...column.tasks,
-                    { ...movedTask, columnId: movePayload.columnId },
-                  ],
-                }
-              : column
-          ),
-        }
-      })
-    )
+    // BoardView applies optimistic move immediately and handles rollback on failure.
+    // Avoid applying a second move here to prevent race-driven card jumpiness.
   }
 
   return (

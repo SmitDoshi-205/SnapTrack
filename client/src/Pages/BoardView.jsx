@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   DndContext,
@@ -52,6 +52,7 @@ function BoardView({
 
   // Drag state
   const [draggingTask, setDraggingTask] = useState(null);
+  const moveSeqByTaskRef = useRef({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -128,6 +129,8 @@ function BoardView({
     if (!task) return;
 
     const previousColumns = board.columns;
+    const moveSeq = (moveSeqByTaskRef.current[taskId] || 0) + 1;
+    moveSeqByTaskRef.current[taskId] = moveSeq;
 
     // Optimistic UI: move card instantly before API round-trip.
     updateColumns((cols) =>
@@ -152,8 +155,10 @@ function BoardView({
 
     const position = toColumn.tasks.length * 1000;
     onMoveTask(boardId, taskId, { columnId: toColumn.id, position }).catch(() => {
-      // Roll back local state if move fails.
-      onUpdateBoard(boardId, previousColumns);
+      // Only rollback if this is still the latest move for this task.
+      if (moveSeqByTaskRef.current[taskId] === moveSeq) {
+        onUpdateBoard(boardId, previousColumns);
+      }
     });
   }
 
