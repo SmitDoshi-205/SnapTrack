@@ -22,4 +22,9 @@ export const boardApi = {
   updateTask: (id, data)       => api.patch(`/tasks/${id}`, data),
   deleteTask: (id)             => api.delete(`/tasks/${id}`),
   moveTask:   (id, data)       => api.patch(`/tasks/${id}/move`, data),
+
+  // Comments
+  getComments:   (taskId)       => api.get(`/tasks/${taskId}/comments`),
+  createComment: (taskId, data) => api.post(`/tasks/${taskId}/comments`, data),
+  deleteComment: (id)           => api.delete(`/comments/${id}`),
 }
