@@ -154,12 +154,14 @@ function BoardView({
     );
 
     const position = toColumn.tasks.length * 1000;
-    onMoveTask(boardId, taskId, { columnId: toColumn.id, position }).catch(() => {
-      // Only rollback if this is still the latest move for this task.
-      if (moveSeqByTaskRef.current[taskId] === moveSeq) {
-        onUpdateBoard(boardId, previousColumns);
-      }
-    });
+    onMoveTask(boardId, taskId, { columnId: toColumn.id, position }).catch(
+      () => {
+        // Only rollback if this is still the latest move for this task.
+        if (moveSeqByTaskRef.current[taskId] === moveSeq) {
+          onUpdateBoard(boardId, previousColumns);
+        }
+      },
+    );
   }
 
   // Loading state while fetching boards from backend
@@ -255,6 +257,7 @@ function BoardView({
         onDelete={handleDeleteTask}
         task={activeTask}
         columnId={activeColId}
+        boardMembers={board?.members || []}
       />
     </div>
   );
