@@ -1,5 +1,6 @@
 import prisma from '../config/db.js'
 import { emitBoardEvent } from '../realtime/socket.js'
+import { sendMemberJoinedNotification } from '../services/email.service.js';
 
 //  Helpers 
 
@@ -277,6 +278,31 @@ export async function joinBoard(req, res, next) {
         role:    'editor',
       },
     })
+
+    const [newMember, owner] = await Promise.all([
+      prisma.user.findUnique({
+        where:  { id: req.user.id },
+        select: { name: true },
+      }),
+      prisma.user.findUnique({
+        where:  { id: board.ownerId },
+        select: { id: true, name: true, email: true },
+      }),
+    ])
+
+    // Only send if the joiner is not the owner themselves
+    if (owner?.email && owner.id !== req.user.id) {
+      sendMemberJoinedNotification({
+        to:            owner.email,
+        ownerName:     owner.name,
+        newMemberName: newMember?.name || 'Someone',
+        boardName:     board.name,
+        role:          'editor',
+      }).catch((err) => {
+        // Non-blocking — don't fail the join request if email fails
+        console.error('[Email] Failed to send join notification:', err.message)
+      })
+    }
 
     res.json({
       success: true,
