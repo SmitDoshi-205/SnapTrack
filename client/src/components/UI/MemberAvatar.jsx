@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 function stringToColor(str = '') {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -11,7 +13,9 @@ function stringToColor(str = '') {
   return colors[Math.abs(hash) % colors.length]
 }
 
-function MemberAvatar({ user, size = 'sm', showName = false }) {
+function MemberAvatar({ user, size = 'sm', showName = false, role = null }) {
+  const [showTooltip, setShowTooltip] = useState(false)
+
   if (!user) return null
 
   const initial    = user.name?.charAt(0).toUpperCase() || '?'
@@ -24,8 +28,17 @@ function MemberAvatar({ user, size = 'sm', showName = false }) {
     lg: 'w-11 h-11 text-base',
   }
 
+  const roleLabel = role
+    ? role.charAt(0).toUpperCase() + role.slice(1)
+    : null
+
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="relative flex items-center gap-2"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {/* Avatar circle */}
       <div className={`
         ${sizeClasses[size] || sizeClasses.sm}
         ${colorClass}
@@ -34,6 +47,9 @@ function MemberAvatar({ user, size = 'sm', showName = false }) {
         flex-shrink-0
         font-semibold text-white
         ring-2 ring-white dark:ring-gray-800
+        cursor-default
+        transition-transform duration-100
+        ${showTooltip ? 'scale-110' : ''}
       `}>
         {user.avatarUrl ? (
           <img
@@ -45,10 +61,36 @@ function MemberAvatar({ user, size = 'sm', showName = false }) {
           initial
         )}
       </div>
+
+      {/* Inline name */}
       {showName && (
         <span className="text-sm text-gray-700 dark:text-gray-300">
           {user.name}
         </span>
+      )}
+
+      {/* Hover tooltip */}
+      {showTooltip && (role !== undefined) && (
+        <div className="
+          absolute bottom-full left-1/2 -translate-x-1/2 mb-2
+          bg-gray-900 dark:bg-gray-700
+          text-white text-xs
+          px-2.5 py-1.5 rounded-lg
+          whitespace-nowrap
+          pointer-events-none
+          z-50
+          shadow-lg
+        ">
+          <p className="font-medium">{user.name}</p>
+          {roleLabel && (
+            <p className="text-gray-400 text-xs">{roleLabel}</p>
+          )}
+          {/* Tooltip arrow */}
+          <div className="
+            absolute top-full left-1/2 -translate-x-1/2
+            border-4 border-transparent border-t-gray-900 dark:border-t-gray-700
+          "/>
+        </div>
       )}
     </div>
   )
