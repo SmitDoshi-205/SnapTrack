@@ -13,6 +13,7 @@ import Column from "../components/Kanban/Column.jsx";
 import TaskCard from "../components/Kanban/TaskCard.jsx";
 import TaskModal from "../components/Kanban/TaskModal.jsx";
 import SkeletonCard from "../components/UI/SkeletonCard.jsx";
+import MemberAvatar from '../components/UI/MemberAvatar.jsx';
 
 const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
@@ -65,7 +66,7 @@ function BoardView({
     onUpdateBoard(boardId, updated);
   }
 
-  // ── Modal handlers ────────────────────────────────────────────────────────
+  //  Modal handlers 
   function handleAddTask(columnId) {
     setActiveTask(null);
     setActiveColId(columnId);
@@ -84,7 +85,7 @@ function BoardView({
     setActiveColId(null);
   }
 
-  // ── Task CRUD ─────────────────────────────────────────────────────────────
+  //  Task CRUD 
   async function handleAddNewTask(columnId, newTask) {
     await onCreateTask(boardId, columnId, newTask);
   }
@@ -97,7 +98,7 @@ function BoardView({
     await onDeleteTask(boardId, taskId);
   }
 
-  // ── Drag and drop ─────────────────────────────────────────────────────────
+  //  Drag and drop 
   function handleDragStart(event) {
     const task = board?.columns
       .flatMap((col) => col.tasks)
@@ -132,7 +133,6 @@ function BoardView({
     const moveSeq = (moveSeqByTaskRef.current[taskId] || 0) + 1;
     moveSeqByTaskRef.current[taskId] = moveSeq;
 
-    // Optimistic UI: move card instantly before API round-trip.
     updateColumns((cols) =>
       cols.map((col) => {
         if (col.id === fromColumn.id) {
@@ -156,7 +156,6 @@ function BoardView({
     const position = toColumn.tasks.length * 1000;
     onMoveTask(boardId, taskId, { columnId: toColumn.id, position }).catch(
       () => {
-        // Only rollback if this is still the latest move for this task.
         if (moveSeqByTaskRef.current[taskId] === moveSeq) {
           onUpdateBoard(boardId, previousColumns);
         }
@@ -188,7 +187,7 @@ function BoardView({
     );
   }
 
-  // ── Board not found ───────────────────────────────────────────────────────
+  //  Board not found 
   if (!board) {
     return (
       <div className="h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center gap-3">
@@ -203,7 +202,7 @@ function BoardView({
     );
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
+  //  Main render 
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-200 flex flex-col overflow-hidden">
       <Navbar
@@ -213,12 +212,75 @@ function BoardView({
         onBack={() => navigate("/")}
       />
 
-      {board.inviteCode && (
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-2 flex items-center justify-between">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Share this board with your team
-          </p>
-          <InviteCodeDisplay inviteCode={board.inviteCode} />
+      {/* Board subbar — invite code + member avatars */}
+      {board && (
+        <div
+          className="
+    bg-white dark:bg-gray-800
+    border-b border-gray-200 dark:border-gray-700
+    px-6 py-2
+    flex items-center justify-between
+    flex-shrink-0
+  "
+        >
+          {/* Left — member avatars with hover tooltip */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              Members
+            </span>
+            <div className="flex items-center">
+              {(board.members || []).map((member, index) => (
+                <div
+                  key={member.userId || member.user?.id}
+                  style={{
+                    marginLeft: index > 0 ? "-8px" : "0",
+                    zIndex: index,
+                  }}
+                  className="relative"
+                >
+                  <MemberAvatar
+                    user={member.user}
+                    size="sm"
+                    role={member.role}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right — invite code + analytics */}
+          <div className="flex items-center gap-3">
+            {board.inviteCode && (
+              <InviteCodeDisplay inviteCode={board.inviteCode} />
+            )}
+            <button
+              onClick={() => navigate(`/board/${boardId}/analytics`)}
+              className="
+          flex items-center gap-1.5
+          text-xs font-medium
+          text-gray-500 dark:text-gray-400
+          hover:text-blue-600 dark:hover:text-blue-400
+          transition-colors duration-150
+        "
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+              Analytics
+            </button>
+          </div>
         </div>
       )}
 
