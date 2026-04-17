@@ -1,11 +1,9 @@
 import { env } from './config/env.js'
 import app from './app.js'
 import prisma from './config/db.js'
-import http from 'http'
-import { initSocket } from './realtime/socket.js'
+import { startDueDateReminderJob } from './jobs/dueDateReminder.job.js'
 
 async function main() {
-  // Test database connection before starting
   try {
     await prisma.$connect()
     console.log('Database connected')
@@ -14,10 +12,10 @@ async function main() {
     process.exit(1)
   }
 
-  const server = http.createServer(app)
-  initSocket(server)
+  // Start background jobs
+  startDueDateReminderJob()
 
-  server.listen(env.port, () => {
+  app.listen(env.port, () => {
     console.log(`SnapTrack server running on http://localhost:${env.port}`)
     console.log(`Environment: ${env.nodeEnv}`)
   })
