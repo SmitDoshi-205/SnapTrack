@@ -1,32 +1,32 @@
-import { useState, useEffect, useRef } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import Dashboard from './Pages/Dashboard.jsx'
-import BoardView from './Pages/BoardView.jsx'
-import Login from './Pages/Login.jsx'
-import Register from './Pages/Register.jsx'
-import JoinBoard from './Pages/JoinBoard.jsx'
-import ProtectedRoute from './components/ProtectedRoute.jsx'
-import { getInitialTheme, applyTheme } from './Store/themeStore.js'
-import { useAuthStore } from './Store/authStore.js'
-import { authApi } from './api/auth.api.js'
-import { boardApi } from './api/board.api.js'
-import { io } from 'socket.io-client'
+import { useState, useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import Dashboard from "./Pages/Dashboard.jsx";
+import BoardView from "./Pages/BoardView.jsx";
+import Login from "./Pages/Login.jsx";
+import Register from "./Pages/Register.jsx";
+import JoinBoard from "./Pages/JoinBoard.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import { getInitialTheme, applyTheme } from "./Store/themeStore.js";
+import { useAuthStore } from "./Store/authStore.js";
+import { authApi } from "./api/auth.api.js";
+import { boardApi } from "./api/board.api.js";
+import { io } from "socket.io-client";
 
-const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 }
+const PRIORITY_ORDER = { High: 0, Medium: 1, Low: 2 };
 
 function sortTasksByPriority(tasks = []) {
   return [...tasks].sort(
     (a, b) =>
       (PRIORITY_ORDER[a.priority] ?? Number.MAX_SAFE_INTEGER) -
-      (PRIORITY_ORDER[b.priority] ?? Number.MAX_SAFE_INTEGER)
-  )
+      (PRIORITY_ORDER[b.priority] ?? Number.MAX_SAFE_INTEGER),
+  );
 }
 
 function sortColumnsByTaskPriority(columns = []) {
   return columns.map((column) => ({
     ...column,
     tasks: sortTasksByPriority(column.tasks || []),
-  }))
+  }));
 }
 
 function normalizeTask(task) {
@@ -34,10 +34,10 @@ function normalizeTask(task) {
     ...task,
     tags: Array.isArray(task.tags)
       ? task.tags
-          .map((t) => (typeof t === 'string' ? t : t?.tag?.name))
+          .map((t) => (typeof t === "string" ? t : t?.tag?.name))
           .filter(Boolean)
       : [],
-  }
+  };
 }
 
 function normalizeBoard(board) {
@@ -47,209 +47,222 @@ function normalizeBoard(board) {
       ...column,
       tasks: (column.tasks || []).map(normalizeTask),
     })),
-  }
+  };
 }
 
 function normalizeAndSortBoard(board) {
-  const normalized = normalizeBoard(board)
+  const normalized = normalizeBoard(board);
   return {
     ...normalized,
     columns: sortColumnsByTaskPriority(normalized.columns || []),
-  }
+  };
 }
 
-function normalizeInviteCode(value = '') {
-  return value.trim().toUpperCase()
+function normalizeInviteCode(value = "") {
+  return value.trim().toUpperCase();
 }
 
 function extractInviteCode(input) {
-  const raw = (input || '').trim()
-  if (!raw) return ''
+  const raw = (input || "").trim();
+  if (!raw) return "";
 
   try {
-    const url = new URL(raw)
-    const parts = url.pathname.split('/').filter(Boolean)
-    if (parts[0]?.toLowerCase() === 'join' && parts[1]) {
-      return normalizeInviteCode(parts[1])
+    const url = new URL(raw);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (parts[0]?.toLowerCase() === "join" && parts[1]) {
+      return normalizeInviteCode(parts[1]);
     }
   } catch {
     // Not a URL. treat as invite code.
   }
 
-  return normalizeInviteCode(raw)
+  return normalizeInviteCode(raw);
 }
 
 function App() {
-  const location = useLocation()
-  const socketRef = useRef(null)
-  const joinedBoardIdsRef = useRef([])
-  const fetchBoardsReqIdRef = useRef(0)
-  const refreshBoardReqIdRef = useRef({})
+  const location = useLocation();
+  const socketRef = useRef(null);
+  const joinedBoardIdsRef = useRef([]);
+  const fetchBoardsReqIdRef = useRef(0);
+  const refreshBoardReqIdRef = useRef({});
 
-  //  Theme 
-  const [isDark, setIsDark] = useState(getInitialTheme)
-  useEffect(() => { applyTheme(isDark) }, [isDark])
-  function handleToggleTheme() { setIsDark((prev) => !prev) }
+  //  Theme
+  const [isDark, setIsDark] = useState(getInitialTheme);
+  useEffect(() => {
+    applyTheme(isDark);
+  }, [isDark]);
+  function handleToggleTheme() {
+    setIsDark((prev) => !prev);
+  }
 
-  //  Auth 
-  const { user, accessToken, setAuth, clearAuth, setLoading } = useAuthStore()
+  //  Auth
+  const { user, accessToken, setAuth, clearAuth, setLoading } = useAuthStore();
 
   useEffect(() => {
     async function checkAuth() {
-      const token = localStorage.getItem('accessToken')
-      if (!token) { setLoading(false); return }
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
       try {
-        const { data } = await authApi.me()
-        setAuth(data.data.user, token)
+        const { data } = await authApi.me();
+        setAuth(data.data.user, token);
       } catch {
-        clearAuth()
+        clearAuth();
       }
     }
-    checkAuth()
-  }, [])
+    checkAuth();
+  }, []);
 
-  //  Boards 
-  const [boards, setBoards]       = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  //  Boards
+  const [boards, setBoards] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   async function fetchBoards() {
-    if (!user) return
+    if (!user) return;
 
-    const requestId = ++fetchBoardsReqIdRef.current
+    const requestId = ++fetchBoardsReqIdRef.current;
 
-    const { data } = await boardApi.getAll()
-    if (requestId !== fetchBoardsReqIdRef.current) return
+    const { data } = await boardApi.getAll();
+    if (requestId !== fetchBoardsReqIdRef.current) return;
 
-    const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard)
-    setBoards(nextBoards)
+    const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard);
+    setBoards(nextBoards);
   }
 
   async function refreshBoard(boardId) {
-    const nextRequestId = (refreshBoardReqIdRef.current[boardId] || 0) + 1
-    refreshBoardReqIdRef.current[boardId] = nextRequestId
+    const nextRequestId = (refreshBoardReqIdRef.current[boardId] || 0) + 1;
+    refreshBoardReqIdRef.current[boardId] = nextRequestId;
 
-    const { data } = await boardApi.getOne(boardId)
-    if (refreshBoardReqIdRef.current[boardId] !== nextRequestId) return
+    const { data } = await boardApi.getOne(boardId);
+    if (refreshBoardReqIdRef.current[boardId] !== nextRequestId) return;
 
-    const normalized = normalizeAndSortBoard(data.data.board)
-    setBoards((prev) => prev.map((b) => (b.id === boardId ? normalized : b)))
+    const normalized = normalizeAndSortBoard(data.data.board);
+    setBoards((prev) => prev.map((b) => (b.id === boardId ? normalized : b)));
   }
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadBoards() {
       if (!user) {
-        setBoards([])
-        setIsLoading(false)
-        return
+        setBoards([]);
+        setIsLoading(false);
+        return;
       }
 
       try {
-        setIsLoading(true)
-        const { data } = await boardApi.getAll()
-        if (!active) return
-        const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard)
-        setBoards(nextBoards)
+        setIsLoading(true);
+        const { data } = await boardApi.getAll();
+        if (!active) return;
+        const nextBoards = (data.data.boards || []).map(normalizeAndSortBoard);
+        setBoards(nextBoards);
       } catch {
-        if (active) setBoards([])
+        if (active) setBoards([]);
       } finally {
-        if (active) setIsLoading(false)
+        if (active) setIsLoading(false);
       }
     }
 
-    loadBoards()
-    return () => { active = false }
-  }, [user?.id])
+    loadBoards();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
 
   useEffect(() => {
-    if (!user) return undefined
-    if (/^\/board\/[^/]+/.test(location.pathname)) return undefined
+    if (!user) return undefined;
+    if (/^\/board\/[^/]+/.test(location.pathname)) return undefined;
 
     const id = setInterval(() => {
-      fetchBoards().catch(() => {})
-    }, 8000)
+      fetchBoards().catch(() => {});
+    }, 8000);
 
-    return () => clearInterval(id)
-  }, [user?.id, location.pathname])
+    return () => clearInterval(id);
+  }, [user?.id, location.pathname]);
 
   useEffect(() => {
-    if (!accessToken) return undefined
+    if (!accessToken) return undefined;
 
-    const socket = io(import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:5000', {
-      auth: { token: accessToken },
-      withCredentials: true,
-    })
+    const socket = io(
+      import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, "") ||
+        "http://localhost:5000",
+      {
+        auth: { token: accessToken },
+        withCredentials: true,
+      },
+    );
 
-    socketRef.current = socket
+    socketRef.current = socket;
 
-    socket.on('board:changed', async ({ boardId }) => {
-      if (!boardId) return
+    socket.on("board:changed", async ({ boardId }) => {
+      if (!boardId) return;
       try {
-        await refreshBoard(boardId)
+        await refreshBoard(boardId);
       } catch {
         // If the board was removed or inaccessible, drop it from local state.
-        setBoards((prev) => prev.filter((board) => board.id !== boardId))
+        setBoards((prev) => prev.filter((board) => board.id !== boardId));
       }
-    })
+    });
 
-    socket.on('board:deleted', ({ boardId }) => {
-      if (!boardId) return
-      setBoards((prev) => prev.filter((board) => board.id !== boardId))
-    })
+    socket.on("board:deleted", ({ boardId }) => {
+      if (!boardId) return;
+      setBoards((prev) => prev.filter((board) => board.id !== boardId));
+    });
 
     return () => {
-      socket.disconnect()
-      socketRef.current = null
-    }
-  }, [user?.id, accessToken])
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [user?.id, accessToken]);
 
   useEffect(() => {
-    const socket = socketRef.current
-    if (!socket) return
+    const socket = socketRef.current;
+    if (!socket) return;
 
-    const currentIds = boards.map((board) => board.id).filter(Boolean)
-    const previousIds = joinedBoardIdsRef.current
+    const currentIds = boards.map((board) => board.id).filter(Boolean);
+    const previousIds = joinedBoardIdsRef.current;
 
-    const toJoin = currentIds.filter((id) => !previousIds.includes(id))
-    const toLeave = previousIds.filter((id) => !currentIds.includes(id))
+    const toJoin = currentIds.filter((id) => !previousIds.includes(id));
+    const toLeave = previousIds.filter((id) => !currentIds.includes(id));
 
-    if (toJoin.length) socket.emit('boards:join', toJoin)
-    if (toLeave.length) socket.emit('boards:leave', toLeave)
+    if (toJoin.length) socket.emit("boards:join", toJoin);
+    if (toLeave.length) socket.emit("boards:leave", toLeave);
 
-    joinedBoardIdsRef.current = currentIds
-  }, [boards])
+    joinedBoardIdsRef.current = currentIds;
+  }, [boards]);
 
   useEffect(() => {
-    if (!user) return
-    fetchBoards().catch(() => {})
-  }, [location.pathname, user?.id])
+    if (!user) return;
+    fetchBoards().catch(() => {});
+  }, [location.pathname, user?.id]);
 
   async function handleCreateBoard({ name, description }) {
-    const { data } = await boardApi.create({ name, description })
-    const created = normalizeBoard(data.data.board)
-    setBoards((prev) => [...prev, created])
-    return created
+    const { data } = await boardApi.create({ name, description });
+    const created = normalizeBoard(data.data.board);
+    setBoards((prev) => [...prev, created]);
+    return created;
   }
 
   async function handleDeleteBoard(boardId) {
-    await boardApi.delete(boardId)
-    setBoards((prev) => prev.filter((b) => b.id !== boardId))
+    await boardApi.delete(boardId);
+    setBoards((prev) => prev.filter((b) => b.id !== boardId));
   }
 
   async function handleJoinByCode(code) {
-    const cleaned = extractInviteCode(code)
-    if (!cleaned) throw new Error('Invite code is required')
+    const cleaned = extractInviteCode(code);
+    if (!cleaned) throw new Error("Invite code is required");
 
-    const { data } = await boardApi.join(cleaned)
-    await fetchBoards()
-    return data.data.boardId
+    const { data } = await boardApi.join(cleaned);
+    await fetchBoards();
+    return data.data.boardId;
   }
 
   async function handleJoinByLink(link) {
-    const cleaned = extractInviteCode(link)
-    if (!cleaned) throw new Error('Invite link is invalid')
-    return handleJoinByCode(cleaned)
+    const cleaned = extractInviteCode(link);
+    if (!cleaned) throw new Error("Invite link is invalid");
+    return handleJoinByCode(cleaned);
   }
 
   function handleUpdateBoard(boardId, updatedColumns) {
@@ -257,69 +270,76 @@ function App() {
       prev.map((b) =>
         b.id === boardId
           ? { ...b, columns: sortColumnsByTaskPriority(updatedColumns || []) }
-          : b
-      )
-    )
+          : b,
+      ),
+    );
   }
 
   async function handleCreateTask(boardId, columnId, taskPayload) {
-    const { data } = await boardApi.createTask(columnId, taskPayload)
-    const createdTask = normalizeTask(data.data.task)
+    try {
+      const { data } = await boardApi.createTask(columnId, taskPayload);
+      const createdTask = normalizeTask(data.data.task);
 
-    setBoards((prev) =>
-      prev.map((board) => {
-        if (board.id !== boardId) return board
+      setBoards((prev) =>
+        prev.map((board) => {
+          if (board.id !== boardId) return board;
+          return {
+            ...board,
+            columns: board.columns.map((column) => {
+              if (column.id !== columnId) return column;
+              // Add new task and re-sort by priority
+              const updatedTasks = sortTasksByPriority([
+                ...column.tasks,
+                createdTask,
+              ]);
+              return { ...column, tasks: updatedTasks };
+            }),
+          };
+        }),
+      );
 
-        return {
-          ...board,
-          columns: board.columns.map((column) =>
-            column.id === columnId
-              ? {
-                  ...column,
-                  tasks: sortTasksByPriority([...column.tasks, createdTask]),
-                }
-              : column
-          ),
-        }
-      })
-    )
-
-    return createdTask
+      return createdTask;
+    } catch (err) {
+      throw err;
+    }
   }
 
   async function handleUpdateTask(boardId, taskId, taskPayload) {
-    const { data } = await boardApi.updateTask(taskId, taskPayload)
-    const updatedTask = normalizeTask(data.data.task)
+    try {
+      const { data } = await boardApi.updateTask(taskId, taskPayload);
+      const updatedTask = normalizeTask(data.data.task);
 
-    setBoards((prev) =>
-      prev.map((board) => {
-        if (board.id !== boardId) return board
+      setBoards((prev) =>
+        prev.map((board) => {
+          if (board.id !== boardId) return board;
+          return {
+            ...board,
+            columns: board.columns.map((column) => {
+              const hasTask = column.tasks.some((t) => t.id === taskId);
+              if (!hasTask) return column;
+              const updatedTasks = sortTasksByPriority(
+                column.tasks.map((t) =>
+                  t.id === taskId ? { ...t, ...updatedTask } : t,
+                ),
+              );
+              return { ...column, tasks: updatedTasks };
+            }),
+          };
+        }),
+      );
 
-        return {
-          ...board,
-          columns: board.columns.map((column) => {
-            const nextTasks = column.tasks.map((task) =>
-              task.id === taskId ? { ...task, ...updatedTask } : task
-            )
-
-            return {
-              ...column,
-              tasks: sortTasksByPriority(nextTasks),
-            }
-          }),
-        }
-      })
-    )
-
-    return updatedTask
+      return updatedTask;
+    } catch (err) {
+      throw err;
+    }
   }
 
   async function handleDeleteTask(boardId, taskId) {
-    await boardApi.deleteTask(taskId)
+    await boardApi.deleteTask(taskId);
 
     setBoards((prev) =>
       prev.map((board) => {
-        if (board.id !== boardId) return board
+        if (board.id !== boardId) return board;
 
         return {
           ...board,
@@ -327,22 +347,19 @@ function App() {
             ...column,
             tasks: column.tasks.filter((task) => task.id !== taskId),
           })),
-        }
-      })
-    )
+        };
+      }),
+    );
   }
 
   async function handleMoveTask(boardId, taskId, movePayload) {
-    await boardApi.moveTask(taskId, movePayload)
-
-    // BoardView applies optimistic move immediately and handles rollback on failure.
-    // Avoid applying a second move here to prevent race-driven card jumpiness.
+    await boardApi.moveTask(taskId, movePayload);
   }
 
   return (
     <Routes>
-      <Route path="/login"      element={<Login />} />
-      <Route path="/register"   element={<Register />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/join/:code" element={<JoinBoard />} />
 
       <Route
@@ -383,7 +400,7 @@ function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default App;
