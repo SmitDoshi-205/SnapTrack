@@ -23,4 +23,7 @@ export const env = {
   refreshSecret:       process.env.REFRESH_TOKEN_SECRET,
   refreshExpiresIn:    process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   clientUrl:           process.env.CLIENT_URL || 'http://localhost:5173',
+  emailProvider:       process.env.EMAIL_PROVIDER || 'gmail',
+  gmailUser:           process.env.GMAIL_USER || '',
+  gmailPass:           process.env.GMAIL_APP_PASSWORD || '',
 }
