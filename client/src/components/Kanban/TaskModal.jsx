@@ -1,20 +1,27 @@
-import { useState, useEffect } from 'react'
-import Input from '../UI/Input.jsx'
-import Button from '../UI/Button.jsx'
-import MemberAvatar from '../UI/MemberAvatar.jsx'
-import { boardApi } from '../../api/board.api.js'
-import { useAuthStore } from '../../Store/authStore.js'
+import { useState, useEffect } from "react";
+import Input from "../UI/Input.jsx";
+import Button from "../UI/Button.jsx";
+import MemberAvatar from "../UI/MemberAvatar.jsx";
+import { boardApi } from "../../api/board.api.js";
+import { useAuthStore } from "../../Store/authStore.js";
 
 const PRIORITY_OPTIONS = [
-  { value: 'Low',    label: 'Low' },
-  { value: 'Medium', label: 'Medium' },
-  { value: 'High',   label: 'High' },
-]
+  { value: "Low", label: "Low" },
+  { value: "Medium", label: "Medium" },
+  { value: "High", label: "High" },
+];
 
 const AVAILABLE_TAGS = [
-  'UI', 'Backend', 'DB', 'Design',
-  'Docs', 'Setup', 'Bug', 'Feature', 'Testing',
-]
+  "UI",
+  "Backend",
+  "DB",
+  "Design",
+  "Docs",
+  "Setup",
+  "Bug",
+  "Feature",
+  "Testing",
+];
 
 function TaskModal({
   isOpen,
@@ -24,77 +31,80 @@ function TaskModal({
   onDelete,
   task,
   columnId,
-  boardMembers = [],  // array of { userId, user: { id, name, avatarUrl } }
+  boardMembers = [], // array of { userId, user: { id, name, avatarUrl } }
 }) {
-  const { user: currentUser } = useAuthStore()
+  const { user: currentUser } = useAuthStore();
 
-  const [title, setTitle]             = useState('')
-  const [description, setDescription] = useState('')
-  const [priority, setPriority]       = useState('Medium')
-  const [dueDate, setDueDate]         = useState('')
-  const [tags, setTags]               = useState([])
-  const [assignedTo, setAssignedTo]   = useState('')
-  const [error, setError]             = useState('')
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("Medium");
+  const [dueDate, setDueDate] = useState("");
+  const [tags, setTags] = useState([]);
+  const [assignedTo, setAssignedTo] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Comments state
-  const [comments, setComments]           = useState([])
-  const [commentBody, setCommentBody]     = useState('')
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [commentSubmitting, setCommentSubmitting] = useState(false)
+  const [comments, setComments] = useState([]);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) return;
     if (task) {
-      setTitle(task.title || '')
-      setDescription(task.description || '')
-      setPriority(task.priority || 'Medium')
-      setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '')
-      setTags(task.tags || [])
-      setAssignedTo(task.assignedTo || task.assignee?.id || '')
-      loadComments(task.id)
+      setTitle(task.title || "");
+      setDescription(task.description || "");
+      setPriority(task.priority || "Medium");
+      setDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+      setTags(task.tags || []);
+      setAssignedTo(task.assignedTo || task.assignee?.id || "");
+      loadComments(task.id);
     } else {
-      setTitle('')
-      setDescription('')
-      setPriority('Medium')
-      setDueDate('')
-      setTags([])
-      setAssignedTo('')
-      setComments([])
+      setTitle("");
+      setDescription("");
+      setPriority("Medium");
+      setDueDate("");
+      setTags([]);
+      setAssignedTo("");
+      setComments([]);
     }
-    setError('')
-    setCommentBody('')
-  }, [task, isOpen])
+    setError("");
+    setCommentBody("");
+  }, [task, isOpen]);
 
   async function loadComments(taskId) {
-    setCommentsLoading(true)
+    setCommentsLoading(true);
     try {
-      const { data } = await boardApi.getComments(taskId)
-      setComments(data.data.comments || [])
+      const { data } = await boardApi.getComments(taskId);
+      setComments(data.data.comments || []);
     } catch {
-      setComments([])
+      setComments([]);
     } finally {
-      setCommentsLoading(false)
+      setCommentsLoading(false);
     }
   }
 
   async function handleAddComment() {
-    if (!commentBody.trim() || !task) return
-    setCommentSubmitting(true)
+    if (!commentBody.trim() || !task) return;
+    setCommentSubmitting(true);
     try {
-      const { data } = await boardApi.createComment(task.id, { body: commentBody.trim() })
-      setComments((prev) => [...prev, data.data.comment])
-      setCommentBody('')
+      const { data } = await boardApi.createComment(task.id, {
+        body: commentBody.trim(),
+      });
+      setComments((prev) => [...prev, data.data.comment]);
+      setCommentBody("");
     } catch {
       // silent fail
     } finally {
-      setCommentSubmitting(false)
+      setCommentSubmitting(false);
     }
   }
 
   async function handleDeleteComment(commentId) {
     try {
-      await boardApi.deleteComment(commentId)
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      await boardApi.deleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch {
       // silent fail
     }
@@ -102,43 +112,55 @@ function TaskModal({
 
   function handleTagToggle(tag) {
     setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    )
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
   }
 
-  function handleSave() {
-    if (!title.trim()) { setError('Task title is required'); return }
+  async function handleSave() {
+    if (!title.trim()) {
+      setError("Task title is required");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError("");
 
     const taskData = {
-      title:       title.trim(),
+      title: title.trim(),
       description: description.trim() || null,
       priority,
-      dueDate:     dueDate || null,
+      dueDate: dueDate || null,
       tags,
-      assignedTo:  assignedTo || null,
-    }
+      assignedTo: assignedTo || null,
+    };
 
-    if (task) {
-      onEdit({ ...taskData, id: task.id })
-    } else {
-      onAdd(columnId, taskData)
+    try {
+      if (task) {
+        await onEdit({ ...taskData, id: task.id });
+      } else {
+        await onAdd(columnId, taskData);
+      }
+      onClose();
+    } catch {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    onClose()
   }
 
   function handleDelete() {
-    if (window.confirm('Delete this task? This cannot be undone.')) {
-      onDelete(task.id, columnId)
-      onClose()
+    if (window.confirm("Delete this task? This cannot be undone.")) {
+      onDelete(task.id, columnId);
+      onClose();
     }
   }
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
-  const isEditMode   = Boolean(task)
+  const isEditMode = Boolean(task);
   const assignedUser = boardMembers.find(
-    (m) => m.userId === assignedTo || m.user?.id === assignedTo
-  )?.user
+    (m) => m.userId === assignedTo || m.user?.id === assignedTo,
+  )?.user;
 
   return (
     <div
@@ -158,7 +180,7 @@ function TaskModal({
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">
-            {isEditMode ? 'Edit task' : 'New task'}
+            {isEditMode ? "Edit task" : "New task"}
           </h2>
           <button
             onClick={onClose}
@@ -215,14 +237,15 @@ function TaskModal({
               <div className="flex flex-wrap gap-2">
                 {/* Unassigned option */}
                 <button
-                  onClick={() => setAssignedTo('')}
+                  onClick={() => setAssignedTo("")}
                   className={`
                     flex items-center gap-1.5
                     text-xs px-2.5 py-1.5 rounded-full border
                     transition-colors duration-150
-                    ${!assignedTo
-                      ? 'bg-gray-700 border-gray-700 text-white dark:bg-gray-200 dark:border-gray-200 dark:text-gray-800'
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-400'
+                    ${
+                      !assignedTo
+                        ? "bg-gray-700 border-gray-700 text-white dark:bg-gray-200 dark:border-gray-200 dark:text-gray-800"
+                        : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-400"
                     }
                   `}
                 >
@@ -231,26 +254,27 @@ function TaskModal({
 
                 {/* Board member options */}
                 {boardMembers.map((member) => {
-                  const memberId  = member.userId || member.user?.id
-                  const isSelected = assignedTo === memberId
+                  const memberId = member.userId || member.user?.id;
+                  const isSelected = assignedTo === memberId;
                   return (
                     <button
                       key={memberId}
-                      onClick={() => setAssignedTo(isSelected ? '' : memberId)}
+                      onClick={() => setAssignedTo(isSelected ? "" : memberId)}
                       className={`
                         flex items-center gap-1.5
                         text-xs px-2.5 py-1.5 rounded-full border
                         transition-colors duration-150
-                        ${isSelected
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400'
+                        ${
+                          isSelected
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400"
                         }
                       `}
                     >
                       <MemberAvatar user={member.user} size="xs" />
                       {member.user?.name}
                     </button>
-                  )
+                  );
                 })}
               </div>
 
@@ -284,9 +308,10 @@ function TaskModal({
                   className={`
                     text-xs px-2.5 py-1 rounded-full border
                     transition-colors duration-150
-                    ${tags.includes(tag)
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400'
+                    ${
+                      tags.includes(tag)
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400"
                     }
                   `}
                 >
@@ -302,12 +327,31 @@ function TaskModal({
         {/* Footer */}
         <div className="flex items-center justify-between pt-1">
           {isEditMode ? (
-            <Button variant="danger" onClick={handleDelete}>Delete</Button>
-          ) : <div />}
+            <Button variant="danger" onClick={handleDelete}>
+              Delete
+            </Button>
+          ) : (
+            <div />
+          )}
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" onClick={handleSave}>
-              {isEditMode ? 'Save changes' : 'Add task'}
+            <Button variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  {task ? "Saving..." : "Adding..."}
+                </span>
+              ) : task ? (
+                "Save changes"
+              ) : (
+                "Add task"
+              )}
             </Button>
           </div>
         </div>
@@ -337,9 +381,13 @@ function TaskModal({
                           {comment.user?.name}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(comment.createdAt).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric',
-                          })}
+                          {new Date(comment.createdAt).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                            },
+                          )}
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 break-words">
@@ -365,7 +413,12 @@ function TaskModal({
               <input
                 value={commentBody}
                 onChange={(e) => setCommentBody(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment() } }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
                 placeholder="Add a comment..."
                 className="
                   flex-1 text-xs px-3 py-2 rounded-lg
@@ -388,7 +441,7 @@ function TaskModal({
         )}
       </div>
     </div>
-  )
+  );
 }
 
-export default TaskModal
+export default TaskModal;
