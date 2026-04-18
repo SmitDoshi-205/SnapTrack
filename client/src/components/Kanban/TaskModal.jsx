@@ -4,6 +4,7 @@ import Button from "../UI/Button.jsx";
 import MemberAvatar from "../UI/MemberAvatar.jsx";
 import { boardApi } from "../../api/board.api.js";
 import { useAuthStore } from "../../Store/authStore.js";
+import AttachmentSection from "./AttachmentSection.jsx";
 
 const PRIORITY_OPTIONS = [
   { value: "Low", label: "Low" },
@@ -33,7 +34,6 @@ function TaskModal({
   columnId,
   boardMembers = [], // array of { userId, user: { id, name, avatarUrl } }
 }) {
-  const { user: currentUser } = useAuthStore();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -43,6 +43,7 @@ function TaskModal({
   const [assignedTo, setAssignedTo] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user: currentUser } = useAuthStore();
 
   // Comments state
   const [comments, setComments] = useState([]);
@@ -439,6 +440,13 @@ function TaskModal({
             </div>
           </div>
         )}
+        {/* Attachments */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-5">
+          <AttachmentSection
+            taskId={task?.id}
+            currentUserId={currentUser?.id}
+          />
+        </div>
       </div>
     </div>
   );
