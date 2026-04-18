@@ -4,11 +4,12 @@ import { authApi } from '../api/auth.api.js'
 import { useAuthStore } from '../Store/authStore.js'
 import Input from '../components/UI/Input.jsx'
 import Button from '../components/UI/Button.jsx'
+import logo from '../assets/images/logo.png'
 
 function Login() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const setAuth   = useAuthStore((s) => s.setAuth)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const setAuth  = useAuthStore((s) => s.setAuth)
 
   const [form, setForm]       = useState({ email: '', password: '' })
   const [error, setError]     = useState('')
@@ -41,23 +42,18 @@ function Login() {
   return (
     <div className="
       min-h-screen
-      bg-gradient-to-br from-blue-50 via-white to-gray-50
+      bg-gradient-to-br from-blue-50 via-white to-slate-50
       dark:from-gray-950 dark:via-gray-900 dark:to-gray-950
       flex items-center justify-center p-4
     ">
       <div className="w-full max-w-sm">
 
-        {/* Logo block */}
+        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="
-            w-12 h-12 bg-blue-600 rounded-2xl
-            flex items-center justify-center
-            shadow-lg shadow-blue-200 dark:shadow-blue-900/40
-            mb-4
-          ">
-            <span className="text-white text-lg font-bold">S</span>
+          <div className="mb-4 drop-shadow-md">
+            <img src={logo} alt="SnapTrack" className="w-16 h-16 rounded-2xl object-cover" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
             Welcome back
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -123,13 +119,9 @@ function Login() {
           </form>
         </div>
 
-        {/* Footer */}
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-6">
           Don't have an account?{' '}
-          <Link
-            to="/register"
-            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-          >
+          <Link to="/register" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
             Create one
           </Link>
         </p>

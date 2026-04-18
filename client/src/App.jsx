@@ -5,6 +5,7 @@ import BoardView from "./Pages/BoardView.jsx";
 import Login from "./Pages/Login.jsx";
 import Register from "./Pages/Register.jsx";
 import JoinBoard from "./Pages/JoinBoard.jsx";
+import Analytics from "./Pages/Analytics.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import { getInitialTheme, applyTheme } from "./Store/themeStore.js";
 import { useAuthStore } from "./Store/authStore.js";
@@ -405,6 +406,33 @@ function App() {
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Global analytics — from dashboard */}
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute>
+            <Analytics
+              boards={boards}
+              isDark={isDark}
+              onToggleTheme={handleToggleTheme}
+            />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Per-board analytics */}
+      <Route
+        path="/board/:boardId/analytics"
+        element={
+          <ProtectedRoute>
+            <Analytics
+              boards={boards}
+              isDark={isDark}
+              onToggleTheme={handleToggleTheme}
+            />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   );
 }
