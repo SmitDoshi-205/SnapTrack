@@ -28,4 +28,15 @@ export const boardApi = {
   getComments:   (taskId)       => api.get(`/tasks/${taskId}/comments`),
   createComment: (taskId, data) => api.post(`/tasks/${taskId}/comments`, data),
   deleteComment: (id)           => api.delete(`/comments/${id}`),
+
+  // Attachments
+  getAttachments: (taskId)      => api.get(`/tasks/${taskId}/attachments`),
+  uploadAttachment: (taskId, file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/tasks/${taskId}/attachments`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+  deleteAttachment: (id) => api.delete(`/attachments/${id}`),
 }
