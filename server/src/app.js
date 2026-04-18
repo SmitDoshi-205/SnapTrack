@@ -8,6 +8,8 @@ import boardRoutes   from './routes/board.routes.js'
 import columnRoutes  from './routes/column.routes.js'
 import taskRoutes    from './routes/task.routes.js'
 import memberRoutes  from './routes/member.routes.js'
+import attachmentRoutes from './routes/attachment.routes.js'
+import analyticsRoutes from './routes/analytics.routes.js'
 
 const app = express()
 
@@ -24,6 +26,8 @@ app.use('/api/boards', boardRoutes)
 app.use('/api',        columnRoutes)
 app.use('/api',        taskRoutes)
 app.use('/api',        memberRoutes)
+app.use('/api',        attachmentRoutes)
+app.use('/api',        analyticsRoutes)
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'SnapTrack API is running' })
