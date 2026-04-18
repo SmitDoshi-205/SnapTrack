@@ -9,6 +9,7 @@ export const boardApi = {
   delete:       (id)         => api.delete(`/boards/${id}`),
   join:         (code)       => api.post(`/boards/join/${code}`),
   removeMember: (id, userId) => api.delete(`/boards/${id}/members/${userId}`),
+  leaveBoard:   (id)         => api.delete(`/boards/${id}/leave`),
 
   // Columns
   createColumn:   (boardId, data)    => api.post(`/boards/${boardId}/columns`, data),
