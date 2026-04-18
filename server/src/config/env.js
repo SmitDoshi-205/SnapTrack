@@ -1,12 +1,5 @@
-let dotenvLoaded = false;
-
-try {
-  const dotenv = await import("dotenv");
-  dotenv.config();
-  dotenvLoaded = true;
-} catch (err) {
-  console.log("dotenv not found, skipping (production mode)");
-}
+import dotenv from "dotenv";
+dotenv.config();
 
 const required = ["DATABASE_URL", "JWT_SECRET", "REFRESH_TOKEN_SECRET"];
 
