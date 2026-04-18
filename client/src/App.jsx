@@ -356,6 +356,11 @@ function App() {
     await boardApi.moveTask(taskId, movePayload);
   }
 
+  async function handleLeaveBoard(boardId) {
+    await boardApi.leaveBoard(boardId);
+    setBoards((prev) => prev.filter((b) => b.id !== boardId));
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -394,6 +399,7 @@ function App() {
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
               onMoveTask={handleMoveTask}
+              onLeaveBoard={handleLeaveBoard}
             />
           </ProtectedRoute>
         }
